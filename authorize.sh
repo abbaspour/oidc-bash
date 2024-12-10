@@ -21,10 +21,10 @@ declare AUTH0_REDIRECT_URI='https://jwt.io'
 declare AUTH0_SCOPE='openid profile email'
 declare AUTH0_RESPONSE_TYPE='id_token'
 declare AUTH0_RESPONSE_MODE=''
-#declare authorization_endpoint='authorize'
-declare authorization_endpoint='auth'
+declare authorization_path='authorize'
+#declare authorization_endpoint='auth'
 #declare par_endpoint='oauth/par'
-declare par_endpoint='request'
+declare par_path='request'
 
 function usage() {
     cat <<END >&2
@@ -83,13 +83,11 @@ base64URLEncode() {
 }
 
 gen_code_verifier() {
-    readonly rand=$(random32)
-    base64URLEncode "${rand}"
+    base64URLEncode "$(random32)"
 }
 
 gen_code_challenge() {
-    readonly cc=$(echo -n "$1" | openssl dgst -binary -sha256)
-    base64URLEncode "$cc"
+    base64URLEncode "$(echo -n "$1" | openssl dgst -binary -sha256)"
 }
 
 declare AUTH0_DOMAIN=''
@@ -166,6 +164,10 @@ done
 
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
+declare par_endpoint="${AUTH0_DOMAIN}/${par_path}"
+#declare par_endpoint='https://matls-auth.bank1.directory.sandbox.connectid.com.au/request'
+declare authorization_endpoint="${AUTH0_DOMAIN}/${authorization_path}"
+
 if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
   declare signon_url="${AUTH0_DOMAIN}/${protocol}/${AUTH0_CLIENT_ID}"
   [[ -n "${AUTH0_CONNECTION}" ]] && signon_url+="?connection=${AUTH0_CONNECTION}"
@@ -211,6 +213,7 @@ declare authorize_params="client_id=${AUTH0_CLIENT_ID}&${response_param}&nonce=$
 [[ -n "${org_id}" ]] && authorize_params+="&organization=$(urlencode "${org_id}")"
 [[ -n "${ui_locales}" ]] && authorize_params+="&ui_locales=${ui_locales}"
 [[ -n "${authorization_details}" ]] && authorize_params+="&authorization_details=$(urlencode "${authorization_details}")"
+#authorize_params+="&purpose=testing"
 
 if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
   [[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
@@ -228,11 +231,13 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
                                    printf("\"%s\":\"%s\",\n ", $i, $(i+1))
                                  }
                                }' >> "${tmp_jwt}"
-  echo "\"aud\": \"${AUTH0_DOMAIN}/\""  >> "${tmp_jwt}"
-  echo '}' >> "${tmp_jwt}"
+  readonly jar_exp=$(date +%s --date='5 minutes')
+  readonly jar_now=$(date +%s)
+  echo "\"aud\": \"${AUTH0_DOMAIN}\", \"iat\": ${jar_now}, \"exp\": ${jar_exp}, \"nbf\": ${jar_now} }"  >> "${tmp_jwt}"
   #cat "${tmp_jwt}"
-  readonly signed_request=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${tmp_jwt}" -k "${key_id}" -t oauth-authz-req+jwt)
-  #echo "$signed_request"
+  signed_request=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${tmp_jwt}" -k "${key_id}" -t oauth-authz-req+jwt -A PS256)
+  readonly signed_request
+  echo "$signed_request"
   authorize_params="client_id=${AUTH0_CLIENT_ID}&request=${signed_request}"
 fi
 
@@ -246,20 +251,23 @@ if [[ ${opt_par} -ne 0 ]]; then                       # PAR
     readonly exp=$(date +%s --date='5 minutes')
     readonly now=$(date +%s)
     readonly client_assertion=$(mktemp --suffix=.json)
-    printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s/","exp":%s, "jti": "%s"}' "${now}" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_ID}" "${AUTH0_DOMAIN}" "${exp}" "${now}" >> "${client_assertion}"
-    readonly signed_client_assertion=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${client_assertion}" -k "${key_id}" -t JWT)
+    printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_ID}" "${AUTH0_DOMAIN}" "${exp}" "${now}" >> "${client_assertion}"
+    readonly signed_client_assertion=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${client_assertion}" -k "${key_id}" -t JWT -A PS256)
+    echo signed_client_assertion=$signed_client_assertion
     authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
   fi
-  command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
+  #command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
+  readonly curl='/opt/homebrew/opt/curl/bin/curl'
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
-  declare -r request_uri=$(curl -v -s \
-    --url "${AUTH0_DOMAIN}/${par_endpoint}" \
-    -d "${authorize_params}" | jq . ) #-r '.request_uri')
-    exit 0
+
+  #  --tlsv1.2 --cert transport.pem --key transport.key --cacert connectid-sandbox-ca.pem
+  #  --header "x-fapi-interaction-id: $(random32)" \
+  declare -r request_uri=$("${curl}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
+    -d "${authorize_params}" | jq -r '.request_uri')
   authorize_params="client_id=${AUTH0_CLIENT_ID}&request_uri=${request_uri}"
 fi
 
-declare authorize_url="${AUTH0_DOMAIN}/${authorization_endpoint}?${authorize_params}"
+declare authorize_url="${authorization_endpoint}?${authorize_params}"
 
 if [[ ${opt_pp} -eq 0 ]]; then
   echo "${authorize_url}"
