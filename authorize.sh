@@ -22,9 +22,8 @@ declare AUTH0_SCOPE='openid profile email'
 declare AUTH0_RESPONSE_TYPE='id_token'
 declare AUTH0_RESPONSE_MODE=''
 declare authorization_path='authorize'
-#declare authorization_endpoint='auth'
-#declare par_endpoint='oauth/par'
-declare par_path='request'
+#declare par_path='request'
+declare par_path='oauth/par'
 
 function usage() {
     cat <<END >&2
@@ -45,13 +44,14 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -S state       # state
         -n nonce       # nonce
         -H hint        # login hint
+        -I id_token    # id_token hint
         -O org_id      # organisation id
         -i invitation  # invitation
         -l locale      # ui_locales
         -E endpoint    # change authorization_endpoint. default is ${authorization_endpoint}
         -k key_id      # client credentials key_id
         -K file.pem    # client credentials private key
-        -D details     # authorization_details JSON format
+        -D details     # authorization_details JSON format array, for RAR
         -T protocol    # protocol to use. can be samlp, wsfed or oauth (default)
         -P             # use PAR (pushed authorization request)
         -J             # use JAR (JWT authorization request)
@@ -105,6 +105,7 @@ declare opt_mfa_api=''
 declare opt_state=''
 declare opt_nonce='mynonce'
 declare opt_login_hint=''
+declare opt_id_token_hint=''
 declare org_id=''
 declare ui_locales=''
 declare invitation=''
@@ -119,7 +120,7 @@ declare opt_jar=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:O:i:l:E:k:K:D:T:mFCoPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:mFCoPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -137,6 +138,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:O:i:l:E:k:K:D:T:mFCoPJNhv?" opt
     S) opt_state=${OPTARG} ;;
     n) opt_nonce=${OPTARG} ;;
     H) opt_login_hint=${OPTARG} ;;
+    I) opt_id_token_hint=${OPTARG} ;;
     O) org_id=${OPTARG} ;;
     i) invitation=${OPTARG} ;;
     l) ui_locales=${OPTARG} ;;
@@ -209,6 +211,7 @@ declare authorize_params="client_id=${AUTH0_CLIENT_ID}&${response_param}&nonce=$
 [[ -n "${AUTH0_RESPONSE_MODE}" ]] && authorize_params+="&response_mode=${AUTH0_RESPONSE_MODE}"
 [[ -n "${opt_state}" ]] && authorize_params+="&state=$(urlencode "${opt_state}")"
 [[ -n "${opt_login_hint}" ]] && authorize_params+="&login_hint=$(urlencode "${opt_login_hint}")"
+[[ -n "${opt_id_token_hint}" ]] && authorize_params+="&id_token_hint=$(urlencode "${opt_id_token_hint}")"
 [[ -n "${invitation}" ]] && authorize_params+="&invitation=$(urlencode "${invitation}")"
 [[ -n "${org_id}" ]] && authorize_params+="&organization=$(urlencode "${org_id}")"
 [[ -n "${ui_locales}" ]] && authorize_params+="&ui_locales=${ui_locales}"

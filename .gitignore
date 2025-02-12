@@ -1,3 +1,4 @@
 ./export-management-at.sh
 .env*
 *.json
+cookie.txt
