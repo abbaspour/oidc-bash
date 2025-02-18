@@ -48,7 +48,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -O org_id      # organisation id
         -i invitation  # invitation
         -l locale      # ui_locales
-        -E endpoint    # change authorization_endpoint. default is ${authorization_endpoint}
+        -E key=value   # additional comma separated list of key=value parameters to be sent as ext-key
         -k key_id      # client credentials key_id
         -K file.pem    # client credentials private key
         -D details     # authorization_details JSON format array, for RAR
@@ -117,6 +117,7 @@ declare protocol='oauth'
 declare opt_pp=1
 declare opt_par=0
 declare opt_jar=0
+declare opt_ext_params=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
@@ -129,12 +130,12 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:mFCoPJNhv?" o
     x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
     a) AUTH0_AUDIENCE=${OPTARG} ;;
     r) AUTH0_CONNECTION=${OPTARG} ;;
-    R) AUTH0_RESPONSE_TYPE=$(echo ${OPTARG} | tr ',' ' ') ;;
+    R) AUTH0_RESPONSE_TYPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     f) opt_flow=${OPTARG} ;;
     u) AUTH0_REDIRECT_URI=${OPTARG} ;;
     p) AUTH0_PROMPT=${OPTARG} ;;
     M) AUTH0_RESPONSE_MODE=${OPTARG} ;;
-    s) AUTH0_SCOPE=$(echo ${OPTARG} | tr ',' ' ') ;;
+    s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     S) opt_state=${OPTARG} ;;
     n) opt_nonce=${OPTARG} ;;
     H) opt_login_hint=${OPTARG} ;;
@@ -142,7 +143,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:mFCoPJNhv?" o
     O) org_id=${OPTARG} ;;
     i) invitation=${OPTARG} ;;
     l) ui_locales=${OPTARG} ;;
-    E) authorization_endpoint=${OPTARG} ;;
+    E) opt_ext_params=$(echo "${OPTARG}" | tr ',' ' ') ;;
     k) key_id="${OPTARG}";;
     K) key_file="${OPTARG}";;
     D) authorization_details="${OPTARG}";;
@@ -216,6 +217,7 @@ declare authorize_params="client_id=${AUTH0_CLIENT_ID}&${response_param}&nonce=$
 [[ -n "${org_id}" ]] && authorize_params+="&organization=$(urlencode "${org_id}")"
 [[ -n "${ui_locales}" ]] && authorize_params+="&ui_locales=${ui_locales}"
 [[ -n "${authorization_details}" ]] && authorize_params+="&authorization_details=$(urlencode "${authorization_details}")"
+for p in ${opt_ext_params}; do authorize_params+="&ext-$p"; done
 #authorize_params+="&purpose=testing"
 
 if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
