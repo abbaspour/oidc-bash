@@ -20,6 +20,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-p
         -x secret      # Auth0 client secret
         -p verifier    # PKCE code_verifier (no secret required)
         -a code        # Authorization Code to exchange
+        -r req_id      # back channel authorization (CIBA) auth_req_id
         -D code        # Device Code to exchange
         -u callback    # callback URL
         -b             # HTTP Basic authentication (default is POST payload)
@@ -42,7 +43,7 @@ declare AUTH0_REDIRECT_URI='https://jwt.io'
 declare authorization_code=''
 declare code_verifier=''
 declare grant_type='authorization_code'
-declare code_type='code'
+declare auth_req_id=''
 declare http_basic=0
 declare kid=''
 declare private_pem=''
@@ -50,7 +51,7 @@ declare token_endpoint='/oauth/token'
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:u:a:x:p:D:U:k:f:bhv?" opt; do
+while getopts "e:t:d:c:u:a:x:p:D:r:U:k:f:bhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
@@ -64,6 +65,7 @@ while getopts "e:t:d:c:u:a:x:p:D:U:k:f:bhv?" opt; do
   k) kid=${OPTARG} ;;
   f) private_pem=${OPTARG} ;;
   D) code_type='device_code'; grant_type='urn:ietf:params:oauth:grant-type:device_code'; authorization_code=${OPTARG} ;;
+  r) code_type='auth_req_id'; grant_type='urn:openid:params:grant-type:ciba'; authorization_code=${OPTARG} ;;
   b) http_basic=1 ;;
   v) set -x ;;
   h | ?) usage 0 ;;

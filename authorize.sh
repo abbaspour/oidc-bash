@@ -22,7 +22,7 @@ declare AUTH0_SCOPE='openid profile email'
 declare AUTH0_RESPONSE_TYPE='id_token'
 declare AUTH0_RESPONSE_MODE=''
 declare authorization_path='authorize'
-#declare par_path='request'
+declare bc_authorization_path='bc-authorize'
 declare par_path='oauth/par'
 
 function usage() {
@@ -32,7 +32,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain
         -c client_id   # Auth0 client ID
-        -x secret      # Auth0 client secret (for PAR)
+        -x secret      # Auth0 client secret (for PAR and CIBA)
         -a audience    # Audience
         -r realm       # Connection
         -R types       # comma separated response types (default is "${AUTH0_RESPONSE_TYPE}")
@@ -43,7 +43,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -M model       # response_mode of: web_message, form_post, fragment
         -S state       # state
         -n nonce       # nonce
-        -H hint        # login hint
+        -H hint        # login hint (for CIBA should be JSON with sub and aud)
         -I id_token    # id_token hint
         -O org_id      # organisation id
         -i invitation  # invitation
@@ -55,6 +55,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -T protocol    # protocol to use. can be samlp, wsfed or oauth (default)
         -P             # use PAR (pushed authorization request)
         -J             # use JAR (JWT authorization request)
+        -B message     # use back channel authorize (CIBA request) with given binding message
         -C             # copy to clipboard
         -N             # no pretty print
         -m             # Management API audience
@@ -117,11 +118,13 @@ declare protocol='oauth'
 declare opt_pp=1
 declare opt_par=0
 declare opt_jar=0
+declare opt_ciba=0
+declare opt_binding_message=''
 declare opt_ext_params=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:mFCoPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:B:mFCoPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -151,6 +154,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:mFCoPJNhv?" o
     C) opt_clipboard=1 ;;
     P) opt_par=1 ;;
     J) opt_jar=1 ;;
+    B) opt_ciba=1; opt_binding_message="${OPTARG}" ;;
     N) opt_pp=0 ;;
     o) opt_open=1 ;;
     m) opt_mgmnt=1 ;;
@@ -168,8 +172,8 @@ done
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
 declare par_endpoint="${AUTH0_DOMAIN}/${par_path}"
-#declare par_endpoint='https://matls-auth.bank1.directory.sandbox.connectid.com.au/request'
 declare authorization_endpoint="${AUTH0_DOMAIN}/${authorization_path}"
+declare bc_authorization_endpoint="${AUTH0_DOMAIN}/${bc_authorization_path}"
 
 if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
   declare signon_url="${AUTH0_DOMAIN}/${protocol}/${AUTH0_CLIENT_ID}"
@@ -246,21 +250,22 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
   authorize_params="client_id=${AUTH0_CLIENT_ID}&request=${signed_request}"
 fi
 
+if [[ -n "${AUTH0_CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
+  authorize_params+="&client_secret=${AUTH0_CLIENT_SECRET}"
+elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
+  [[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
+  [[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
+  [[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
+  readonly exp=$(date +%s --date='5 minutes')
+  readonly now=$(date +%s)
+  readonly client_assertion=$(mktemp --suffix=.json)
+  printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_ID}" "${AUTH0_DOMAIN}" "${exp}" "${now}" >> "${client_assertion}"
+  readonly signed_client_assertion=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${client_assertion}" -k "${key_id}" -t JWT -A PS256)
+  echo signed_client_assertion=$signed_client_assertion
+  authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+fi
+
 if [[ ${opt_par} -ne 0 ]]; then                       # PAR
-  if [[ -n "${AUTH0_CLIENT_SECRET}" ]]; then
-    authorize_params+="&client_secret=${AUTH0_CLIENT_SECRET}"
-  elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
-    [[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
-    [[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
-    [[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
-    readonly exp=$(date +%s --date='5 minutes')
-    readonly now=$(date +%s)
-    readonly client_assertion=$(mktemp --suffix=.json)
-    printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_ID}" "${AUTH0_DOMAIN}" "${exp}" "${now}" >> "${client_assertion}"
-    readonly signed_client_assertion=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${client_assertion}" -k "${key_id}" -t JWT -A PS256)
-    echo signed_client_assertion=$signed_client_assertion
-    authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-  fi
   #command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
   readonly curl='/opt/homebrew/opt/curl/bin/curl'
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
@@ -270,6 +275,20 @@ if [[ ${opt_par} -ne 0 ]]; then                       # PAR
   declare -r request_uri=$("${curl}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
     -d "${authorize_params}" | jq -r '.request_uri')
   authorize_params="client_id=${AUTH0_CLIENT_ID}&request_uri=${request_uri}"
+
+elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
+  [[ -z "${opt_login_hint}" ]] && { echo >&2 "login_hint required for CIBA"; exit 1; }
+  [[ -z "${opt_binding_message}" ]] && { echo >&2 "opt_binding_message required for CIBA"; exit 1; }
+  authorize_params+="&binding_message=$(urlencode "${opt_binding_message}")"
+
+  readonly curl='/opt/homebrew/opt/curl/bin/curl'
+  command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
+
+  declare -r auth_req_id=$("${curl}" -s -k --header "accept: application/json" --url "${bc_authorization_endpoint}" \
+    -d "${authorize_params}" | jq -r '.auth_req_id')
+
+  echo "auth_req_id: ${auth_req_id}"
+  exit 0
 fi
 
 declare authorize_url="${authorization_endpoint}?${authorize_params}"
