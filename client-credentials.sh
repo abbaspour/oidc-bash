@@ -21,6 +21,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-i client_id] [-x client_secret] [-a
         -c client_id   # Auth0 client ID
         -x secret      # Auth0 client secret
         -a audience    # API audience
+        -o org_id      # Organization ID
         -k kid         # client public key jwt id
         -f private.pem # client private key pem file
         -m             # Management API audience
@@ -41,6 +42,7 @@ declare AUTH0_CLIENT_ID=''
 declare AUTH0_CLIENT_SECRET=''
 declare AUTH0_AUDIENCE=''
 declare secret=''
+declare organization=''
 declare kid=''
 declare private_pem=''
 declare client_assertion=''
@@ -51,7 +53,7 @@ declare opt_mgmnt=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:a:x:k:f:n:C:Smhv?" opt; do
+while getopts "e:t:d:c:a:o:x:k:f:n:C:Smhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -59,6 +61,7 @@ while getopts "e:t:d:c:a:x:k:f:n:C:Smhv?" opt; do
   c) AUTH0_CLIENT_ID=${OPTARG} ;;
   x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
   a) AUTH0_AUDIENCE=${OPTARG} ;;
+  o) organization="\"organization\": \"${OPTARG}\", " ;;
   k) kid=${OPTARG} ;;
   f) private_pem=${OPTARG} ;;
   n) cname_api_key=${OPTARG} ;;
@@ -92,7 +95,7 @@ fi
 readonly BODY=$(cat <<EOL
 {
     "client_id":"${AUTH0_CLIENT_ID}", ${secret}
-    "audience":"${AUTH0_AUDIENCE}",
+    "audience":"${AUTH0_AUDIENCE}", ${organization}
     "grant_type":"client_credentials" ${client_assertion}
 }
 EOL
