@@ -27,6 +27,8 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-i
         -A audience           # Audience
         -s scopes             # comma separated list of scopes (default is "${AUTH0_SCOPE}")
         -I                    # mark subject_token is id_token
+        -f                    # Token Vault mode. sets grant_type to FCAT
+        -r realm              # connection for FCAT
         -h|?                  # usage
         -v                    # verbose
 
@@ -43,12 +45,15 @@ declare AUTH0_AUDIENCE=''
 
 declare subject_token=''
 declare subject_token_type='access_token'
+declare requested_token_type=''
+declare realm=''
 
+declare grant_type='urn:ietf:params:oauth:grant-type:token-exchange'
 declare opt_verbose=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:A:i:a:T:s:Ihv?" opt; do
+while getopts "e:t:d:c:x:A:i:a:T:s:r:fhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -59,6 +64,11 @@ while getopts "e:t:d:c:x:A:i:a:T:s:Ihv?" opt; do
     i) subject_token=${OPTARG} ;;
     T) subject_token_type=${OPTARG} ;;
     s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
+    f) grant_type='urn:auth0:params:oauth:grant-type:token-exchange:federated-connection-access-token';
+       requested_token_type='"requested_token_type": "http://auth0.com/oauth/token-type/federated-connection-access-token", ';
+       subject_token_type='urn:ietf:params:oauth:token-type:refresh_token';
+       ;;
+    r) realm="\"connection\": \"${OPTARG}\", ";;
     v) set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
@@ -84,12 +94,14 @@ declare audience=''
 
 declare BODY=$(cat <<EOL
 {
-            "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+            "grant_type": "${grant_type}",
             "subject_token" : "${subject_token}",
             "subject_token_type" : "${subject_token_type}",
             ${audience}
             "scope": "${AUTH0_SCOPE}",
+            ${requested_token_type}
             ${secret}
+            ${realm}
             "client_id": "${AUTH0_CLIENT_ID}"
 }
 EOL

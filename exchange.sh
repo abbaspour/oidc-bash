@@ -48,6 +48,7 @@ declare http_basic=0
 declare kid=''
 declare private_pem=''
 declare token_endpoint='/oauth/token'
+declare code_type='code'
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 

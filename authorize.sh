@@ -221,7 +221,7 @@ declare authorize_params="client_id=${AUTH0_CLIENT_ID}&${response_param}&nonce=$
 [[ -n "${org_id}" ]] && authorize_params+="&organization=$(urlencode "${org_id}")"
 [[ -n "${ui_locales}" ]] && authorize_params+="&ui_locales=${ui_locales}"
 [[ -n "${authorization_details}" ]] && authorize_params+="&authorization_details=$(urlencode "${authorization_details}")"
-for p in ${opt_ext_params}; do authorize_params+="&ext-$p"; done
+for p in ${opt_ext_params}; do authorize_params+="&$p"; done
 #authorize_params+="&purpose=testing"
 
 if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
