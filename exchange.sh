@@ -49,6 +49,7 @@ declare kid=''
 declare private_pem=''
 declare token_endpoint='/oauth/token'
 declare code_type='code'
+declare opt_verbose=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
@@ -68,7 +69,7 @@ while getopts "e:t:d:c:u:a:x:p:D:r:U:k:f:bhv?" opt; do
   D) code_type='device_code'; grant_type='urn:ietf:params:oauth:grant-type:device_code'; authorization_code=${OPTARG} ;;
   r) code_type='auth_req_id'; grant_type='urn:openid:params:grant-type:ciba'; authorization_code=${OPTARG} ;;
   b) http_basic=1 ;;
-  v) set -x ;;
+  v) opt_verbose=1;; #set -x ;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
   esac
@@ -114,6 +115,8 @@ EOL
 )
 
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+
+[[ ${opt_verbose} ]] && echo "${BODY}"
 
 if [[ ${http_basic} -eq 1 ]]; then
   curl --request POST \

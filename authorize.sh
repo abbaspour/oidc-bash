@@ -53,6 +53,8 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -K file.pem    # client credentials private key
         -D details     # authorization_details JSON format array, for RAR
         -T protocol    # protocol to use. can be samlp, wsfed or oauth (default)
+        -g token       # send session_transfer_token as get query param
+        -G token       # send session_transfer_token as get cookie param
         -P             # use PAR (pushed authorization request)
         -J             # use JAR (JWT authorization request)
         -B message     # use back channel authorize (CIBA request) with given binding message
@@ -121,10 +123,13 @@ declare opt_jar=0
 declare opt_ciba=0
 declare opt_binding_message=''
 declare opt_ext_params=''
+declare opt_session_transfer_token_query=''
+declare opt_session_transfer_token_cookie=''
+declare opt_verbose=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:B:mFCoPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:g:G:B:mFCoPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -151,6 +156,8 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:B:mFCoPJNhv?"
     K) key_file="${OPTARG}";;
     D) authorization_details="${OPTARG}";;
     T) protocol="${OPTARG}";;
+    g) opt_session_transfer_token_query="${OPTARG}";;
+    G) opt_session_transfer_token_cookie="${OPTARG}";;
     C) opt_clipboard=1 ;;
     P) opt_par=1 ;;
     J) opt_jar=1 ;;
@@ -160,7 +167,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:B:mFCoPJNhv?"
     m) opt_mgmnt=1 ;;
     F) opt_mfa_api=1 ;;
     b) opt_browser="-a ${OPTARG} " ;;
-    v) set -x ;;
+    v) opt_verbose=1;; #set -x ;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
     esac
@@ -221,6 +228,7 @@ declare authorize_params="client_id=${AUTH0_CLIENT_ID}&${response_param}&nonce=$
 [[ -n "${org_id}" ]] && authorize_params+="&organization=$(urlencode "${org_id}")"
 [[ -n "${ui_locales}" ]] && authorize_params+="&ui_locales=${ui_locales}"
 [[ -n "${authorization_details}" ]] && authorize_params+="&authorization_details=$(urlencode "${authorization_details}")"
+[[ -n "${opt_session_transfer_token_query}" ]] && authorize_params+="&session_transfer_token=$(urlencode "${opt_session_transfer_token_query}")"
 for p in ${opt_ext_params}; do authorize_params+="&$p"; done
 #authorize_params+="&purpose=testing"
 
@@ -292,6 +300,10 @@ elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
 fi
 
 declare authorize_url="${authorization_endpoint}?${authorize_params}"
+
+if [[ -n "${opt_session_transfer_token_cookie}" ]]; then
+  curl --cookie "auth0_session_transfer_token=${opt_session_transfer_token_cookie}" "${authorize_url}"
+fi
 
 if [[ ${opt_pp} -eq 0 ]]; then
   echo "${authorize_url}"
