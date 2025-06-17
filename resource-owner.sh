@@ -101,7 +101,7 @@ declare secret=''
 [[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\": \"${AUTH0_CLIENT_SECRET}\","
 
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$(../clients/client-assertion.sh -d "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  readonly assertion=$(./client-assertion.sh -d "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   readonly client_assertion=$(cat <<EOL
   , "client_assertion" : "${assertion}",
   "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
