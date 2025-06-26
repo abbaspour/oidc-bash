@@ -45,7 +45,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -n nonce       # nonce
         -H hint        # login hint (for CIBA should be JSON with sub and aud)
         -I id_token    # id_token hint
-        -O org_id      # organisation id
+        -o org_id      # organisation id
         -i invitation  # invitation
         -l locale      # ui_locales
         -E key=value   # additional comma separated list of key=value parameters to be sent as ext-key
@@ -62,7 +62,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -N             # no pretty print
         -m             # Management API audience
         -F             # MFA API audience
-        -o             # Open URL
+        -O             # Open URL
         -b browser     # Choose browser to open (firefox, chrome, safari)
         -h|?           # usage
         -v             # verbose
@@ -129,7 +129,7 @@ declare opt_verbose=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:g:G:B:mFCoPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:mFCOPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -148,7 +148,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:g:G:B:mFCoPJN
     n) opt_nonce=${OPTARG} ;;
     H) opt_login_hint=${OPTARG} ;;
     I) opt_id_token_hint=${OPTARG} ;;
-    O) org_id=${OPTARG} ;;
+    o) org_id=${OPTARG} ;;
     i) invitation=${OPTARG} ;;
     l) ui_locales=${OPTARG} ;;
     E) opt_ext_params=$(echo "${OPTARG}" | tr ',' ' ') ;;
@@ -163,7 +163,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:O:i:l:E:k:K:D:T:g:G:B:mFCoPJN
     J) opt_jar=1 ;;
     B) opt_ciba=1; opt_binding_message="${OPTARG}" ;;
     N) opt_pp=0 ;;
-    o) opt_open=1 ;;
+    O) opt_open=1 ;;
     m) opt_mgmnt=1 ;;
     F) opt_mfa_api=1 ;;
     b) opt_browser="-a ${OPTARG} " ;;
