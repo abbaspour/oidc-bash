@@ -62,6 +62,11 @@ elif openssl ec -in "${pem_file}" -check >/dev/null 2>&1; then
     [[ -z "${alg}" ]] && alg='ES256'
     pub_key_details=$(openssl ec -in "${pem_file}" -text -noout)
     crv_name=$(echo "${pub_key_details}" | awk -F':' '/ASN1 OID: / {print $2}' | tr -d '[:space:]')
+    case "${crv_name}" in
+        prime256v1) crv_name="P-256" ;;
+        secp384r1) crv_name="P-384" ;;
+        secp521r1) crv_name="P-521" ;;
+    esac
     pub_hex=$(echo "${pub_key_details}" | awk '/pub:/{flag=1;next}/ASN1 OID:/{flag=0}flag' | tr -d '[:space:]:' | sed 's/^04//')
     x_hex=$(echo "${pub_hex}" | cut -c 1-64)
     y_hex=$(echo "${pub_hex}" | cut -c 65-128)
@@ -82,7 +87,42 @@ jti=$(openssl rand -hex 16)
 payload=$(printf '{"iat":%s,"jti":"%s","htm":"%s","htu":"%s"}' "${iat}" "${jti}" "${http_method}" "${http_uri}" | base64url)
 
 # Sign
-signature=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${pem_file}" -binary | base64url)
+if [[ "${alg}" =~ "ES" ]]; then
+    # For ECDSA, OpenSSL produces a DER-encoded signature.
+    # We need to convert it to the raw R and S values concatenated.
+    der_sig=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${pem_file}" -binary)
+    hex_sig=$(echo -n "${der_sig}" | xxd -p -c 256)
+
+    # ASN.1 DER format: 30 len 02 lenR r 02 lenS s
+    # We need to extract r and s.
+
+    # Get length of R
+    lenR=$((16#${hex_sig:6:2}))
+    # Extract R
+    r_offset=8
+    r_hex=${hex_sig:${r_offset}:$((lenR*2))}
+    # Remove leading 00 if present
+    if [[ ${lenR} -eq 33 && ${r_hex:0:2} == "00" ]]; then
+        r_hex=${r_hex:2}
+    fi
+
+    # Get length of S
+    # The S part starts after R. The format is `02 lenS s`.
+    # So, we skip the `02` tag before S.
+    lenS_offset=$((r_offset + lenR*2 + 2))
+    lenS=$((16#${hex_sig:${lenS_offset}:2}))
+    # Extract S
+    s_offset=$((lenS_offset + 2))
+    s_hex=${hex_sig:${s_offset}:$((lenS*2))}
+    # Remove leading 00 if present
+    if [[ ${lenS} -eq 33 && ${s_hex:0:2} == "00" ]]; then
+        s_hex=${s_hex:2}
+    fi
+
+    signature=$(echo -n "${r_hex}${s_hex}" | xxd -r -p | base64url)
+else # RSA
+    signature=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${pem_file}" -binary | base64url)
+fi
 
 # Assemble JWT
 echo "${header}.${payload}.${signature}"
