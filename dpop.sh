@@ -1,128 +1,147 @@
 #!/usr/bin/env bash
 
-##########################################################################################
-# Author: Amin Abbaspour
-# Date: 2024-07-26
-# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
-##########################################################################################
+# dpop.sh: A script to generate DPoP JWTs for EC keys using OpenSSL.
+# Follows the specification RFC 9449.
 
-set -euo pipefail
+set -e
+set -o pipefail
 
-command -v openssl >/dev/null || { echo >&2 "error: openssl not found"; exit 3; }
-command -v jq >/dev/null || { echo >&2 "error: jq not found"; exit 3; }
-command -v xxd >/dev/null || { echo >&2 "error: xxd not found"; exit 3; }
+# --- Configuration ---
+# Modify the command path for openssl if needed.
+OPENSSL_CMD="/opt/homebrew/bin/openssl"
 
-function usage() {
-    cat <<END >&2
-USAGE: $0 -p pem_file -m http_method -u http_uri [-a alg] [-h]
-        -p pem_file     # private key PEM file
-        -m http_method  # HTTP method (e.g., POST)
-        -u http_uri     # HTTP URI (e.g., https://server.com/token)
-        -a alg          # algorithm (optional, auto-detected from key type: RS256 for RSA, ES256 for EC)
-        -h|?            # usage
-END
-    exit $1
+# --- Default Values ---
+METHOD="POST"
+
+# --- Function Definitions ---
+
+# URL-safe base64 encoding
+# RFC 4648 sec 5: '+' -> '-', '/' -> '_', remove '=' padding
+base64url_encode() {
+    ${OPENSSL_CMD} base64 -e -A | tr -- '+/' '-_' | tr -d '='
 }
 
-declare pem_file=''
-declare http_method=''
-declare http_uri=''
-declare alg=''
+# Simple error logging and exit
+fail() {
+    echo "Error: $1" >&2
+    exit 1
+}
 
-while getopts "p:m:u:a:h?" opt; do
-    case ${opt} in
-        p) pem_file=${OPTARG};;
-        m) http_method=${OPTARG};;
-        u) http_uri=${OPTARG};;
-        a) alg=${OPTARG};;
-        h|?) usage 0;;
-        *) usage 1;;
-    esac
+# --- Argument Parsing with getopts ---
+while getopts ":r:m:u:" opt; do
+  case ${opt} in
+    r )
+      PRIVATE_KEY_FILE=$OPTARG
+      ;;
+    m )
+      METHOD=$OPTARG
+      ;;
+    u )
+      URL=$OPTARG
+      ;;
+    \? )
+      fail "Invalid option: -$OPTARG"
+      ;;
+    : )
+      fail "Invalid option: -$OPTARG requires an argument"
+      ;;
+  esac
 done
 
-[[ -z "${pem_file}" ]] && { echo >&2 "ERROR: pem_file undefined."; usage 1; }
-[[ ! -f "${pem_file}" ]] && { echo >&2 "ERROR: pem_file missing: ${pem_file}"; usage 1; }
-[[ -z "${http_method}" ]] && { echo >&2 "ERROR: http_method undefined."; usage 1; }
-[[ -z "${http_uri}" ]] && { echo >&2 "ERROR: http_uri undefined."; usage 1; }
-
-# Function to base64url encode
-base64url() {
-    openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E 's/=+$//'
-}
-
-# Extract public key components and create JWK
-if openssl rsa -in "${pem_file}" -check >/dev/null 2>&1; then
-    [[ -z "${alg}" ]] && alg='RS256'
-    pub_key_details=$(openssl rsa -in "${pem_file}" -text -noout)
-    n=$(echo "${pub_key_details}" | awk '/modulus:/{flag=1;next}/publicExponent:/{flag=0}flag' | tr -d '[:space:]:' | xxd -r -p | base64url)
-    e_hex=$(echo "${pub_key_details}" | awk '/publicExponent:/ {print $2}' | sed 's/.*(0x\(.*\))/\1/')
-    e=$(echo -n "${e_hex}" | xxd -r -p | base64url)
-    jwk=$(printf '{"kty":"RSA","n":"%s","e":"%s"}' "${n}" "${e}")
-elif openssl ec -in "${pem_file}" -check >/dev/null 2>&1; then
-    [[ -z "${alg}" ]] && alg='ES256'
-    pub_key_details=$(openssl ec -in "${pem_file}" -text -noout)
-    crv_name=$(echo "${pub_key_details}" | awk -F':' '/ASN1 OID: / {print $2}' | tr -d '[:space:]')
-    case "${crv_name}" in
-        prime256v1) crv_name="P-256" ;;
-        secp384r1) crv_name="P-384" ;;
-        secp521r1) crv_name="P-521" ;;
-    esac
-    pub_hex=$(echo "${pub_key_details}" | awk '/pub:/{flag=1;next}/ASN1 OID:/{flag=0}flag' | tr -d '[:space:]:' | sed 's/^04//')
-    x_hex=$(echo "${pub_hex}" | cut -c 1-64)
-    y_hex=$(echo "${pub_hex}" | cut -c 65-128)
-    x=$(echo -n "${x_hex}" | xxd -r -p | base64url)
-    y=$(echo -n "${y_hex}" | xxd -r -p | base64url)
-    jwk=$(printf '{"kty":"EC","crv":"%s","x":"%s","y":"%s"}' "${crv_name}" "${x}" "${y}")
-else
-    echo >&2 "ERROR: Unsupported key type. Only RSA and EC keys are supported for DPoP generation."
-    exit 1
+# --- Validate Inputs ---
+if [ -z "${PRIVATE_KEY_FILE}" ]; then
+    fail "Private key file is required. Use -r <private-key-file>"
+fi
+if [ ! -f "${PRIVATE_KEY_FILE}" ]; then
+    fail "Private key file not found at ${PRIVATE_KEY_FILE}"
+fi
+if [ -z "${URL}" ]; then
+    fail "URL is required. Use -u <url>"
+fi
+if [ -z "${METHOD}" ]; then
+    fail "Method is required. Use -m <method>"
 fi
 
-# Create Header
-header=$(printf '{"typ":"dpop+jwt","alg":"%s","jwk":%s}' "${alg}" "${jwk}" | base64url)
+# --- Main Script Logic ---
 
-# Create Payload
-iat=$(date +%s)
-jti=$(openssl rand -hex 16)
-payload=$(printf '{"iat":%s,"jti":"%s","htm":"%s","htu":"%s"}' "${iat}" "${jti}" "${http_method}" "${http_uri}" | base64url)
-
-# Sign
-if [[ "${alg}" =~ "ES" ]]; then
-    # For ECDSA, OpenSSL produces a DER-encoded signature.
-    # We need to convert it to the raw R and S values concatenated.
-    der_sig=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${pem_file}" -binary)
-    hex_sig=$(echo -n "${der_sig}" | xxd -p -c 256)
-
-    # ASN.1 DER format: 30 len 02 lenR r 02 lenS s
-    # We need to extract r and s.
-
-    # Get length of R
-    lenR=$((16#${hex_sig:6:2}))
-    # Extract R
-    r_offset=8
-    r_hex=${hex_sig:${r_offset}:$((lenR*2))}
-    # Remove leading 00 if present
-    if [[ ${lenR} -eq 33 && ${r_hex:0:2} == "00" ]]; then
-        r_hex=${r_hex:2}
-    fi
-
-    # Get length of S
-    # The S part starts after R. The format is `02 lenS s`.
-    # So, we skip the `02` tag before S.
-    lenS_offset=$((r_offset + lenR*2 + 2))
-    lenS=$((16#${hex_sig:${lenS_offset}:2}))
-    # Extract S
-    s_offset=$((lenS_offset + 2))
-    s_hex=${hex_sig:${s_offset}:$((lenS*2))}
-    # Remove leading 00 if present
-    if [[ ${lenS} -eq 33 && ${s_hex:0:2} == "00" ]]; then
-        s_hex=${s_hex:2}
-    fi
-
-    signature=$(echo -n "${r_hex}${s_hex}" | xxd -r -p | base64url)
-else # RSA
-    signature=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${pem_file}" -binary | base64url)
+# 1. Derive Public Key from the Private Key
+PUBLIC_KEY=$(${OPENSSL_CMD} ec -in "${PRIVATE_KEY_FILE}" -pubout 2>/dev/null)
+if [ $? -ne 0 ]; then
+    fail "Failed to derive public key from the private key."
 fi
 
-# Assemble JWT
-echo "${header}.${payload}.${signature}"
+# 2. Extract EC key parameters (crv, x, y) to build the JWK.
+# We use openssl to get the key details in a parsable format.
+# The curve name from OpenSSL needs to be mapped to the RFC JWK 'crv' name.
+# For prime256v1 (secp256r1), the crv is "P-256".
+CURVE_NAME=$(cat "${PRIVATE_KEY_FILE}" | ${OPENSSL_CMD} ec -noout -text 2>/dev/null | grep "ASN1 OID" | awk '{print $3}')
+case ${CURVE_NAME} in
+    "prime256v1")
+        CRV="P-256"
+        ;;
+    # Add other curves here if needed, e.g., secp384r1 -> P-384
+    *)
+        fail "Unsupported EC curve: ${CURVE_NAME}. This script currently only supports prime256v1 (P-256)."
+        ;;
+esac
+
+readonly coords="$(echo "${PUBLIC_KEY}" | ${OPENSSL_CMD} ec -pubin -noout -text -conv_form uncompressed 2>/dev/null | grep -E "^ +.*" | tr -d ' \n' | sed 's/^...//' | tr -d ':')"
+
+readonly X_HEX=${coords:0:${#coords}/2} # first half
+readonly Y_HEX=${coords:${#coords}/2}   # second half
+
+
+# Convert hex coordinates to base64url
+X_B64=$(echo "${X_HEX}" | xxd -r -p | base64url_encode)
+Y_B64=$(echo "${Y_HEX}" | xxd -r -p | base64url_encode)
+
+# 3. Construct JWT Header with the JWK
+# The header contains the algorithm (ES256) and the public key as a JWK.
+JWK="{\"kty\":\"EC\",\"crv\":\"${CRV}\",\"x\":\"${X_B64}\",\"y\":\"${Y_B64}\"}"
+HEADER="{\"typ\":\"dpop+jwt\",\"alg\":\"ES256\",\"jwk\":${JWK}}"
+ENCODED_HEADER=$(echo -n "${HEADER}" | base64url_encode)
+
+# 4. Construct JWT Payload
+# It includes a unique token identifier (jti), the HTTP method (htm),
+# the HTTP URI (htu), and the issued-at timestamp (iat).
+JTI=$(${OPENSSL_CMD} rand -hex 16)
+IAT=$(date +%s)
+PAYLOAD="{\"jti\":\"${JTI}\",\"htm\":\"${METHOD}\",\"htu\":\"${URL}\",\"iat\":${IAT}}"
+ENCODED_PAYLOAD=$(echo -n "${PAYLOAD}" | base64url_encode)
+
+# 5. Create the Signing Input
+SIGNING_INPUT="${ENCODED_HEADER}.${ENCODED_PAYLOAD}"
+
+# 6. Sign, Parse, and Convert the Signature
+# The signing input is signed, and the resulting binary DER signature is
+# piped directly to `openssl asn1parse` to robustly extract the R and S integers.
+HEX_VALUES=$(echo -n "${SIGNING_INPUT}" \
+    | ${OPENSSL_CMD} dgst -sha256 -sign "${PRIVATE_KEY_FILE}" -binary \
+    | ${OPENSSL_CMD} asn1parse -inform DER \
+    | grep "INTEGER" | awk '{print $NF}' | tr -d ':')
+
+# Separate r and s
+R_HEX=$(echo "${HEX_VALUES}" | head -n 1)
+S_HEX=$(echo "${HEX_VALUES}" | tail -n 1)
+
+# The integers r and s may have a leading '00' byte if their first bit is 1.
+# This is to ensure they are parsed as positive numbers. We must strip this
+# leading '00' byte if it exists and the hex string is longer than 64 characters (32 bytes).
+if [ ${#R_HEX} -gt 64 ]; then
+    R_HEX=${R_HEX: -64}
+fi
+if [ ${#S_HEX} -gt 64 ]; then
+    S_HEX=${S_HEX: -64}
+fi
+
+# The final signature is the concatenation of r and s.
+RAW_SIGNATURE_HEX="${R_HEX}${S_HEX}"
+
+# 7. Base64url Encode the Raw Signature
+ENCODED_SIGNATURE=$(echo "${RAW_SIGNATURE_HEX}" | xxd -r -p | base64url_encode)
+
+# 8. Assemble the final DPoP JWT
+DPOP_JWT="${SIGNING_INPUT}.${ENCODED_SIGNATURE}"
+
+# --- Output the JWT ---
+echo "${DPOP_JWT}"

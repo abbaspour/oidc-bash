@@ -122,7 +122,7 @@ EOL
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
 if [[ -n "${dpop_pem_file}" ]]; then
-    dpop_header="DPoP: $(./dpop.sh -p "${dpop_pem_file}" -m POST -u "${AUTH0_DOMAIN}${token_endpoint}")"
+    dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${AUTH0_DOMAIN}${token_endpoint}")"
 fi
 
 [[ ${opt_verbose} ]] && echo "${BODY}"
