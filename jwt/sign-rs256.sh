@@ -2,7 +2,6 @@
 
 ##########################################################################################
 # Author: Amin Abbaspour
-# Modified by: ChatGPT
 # Date: 2022-06-12 (Modified: 2024-10-25)
 # License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
 ##########################################################################################

@@ -21,7 +21,6 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-p
         -c client_id   # Auth0 client ID
         -x secret      # Auth0 client secret
         -p verifier    # PKCE code_verifier
-        -P pem         # DPoP private key file
         -a code        # Authorization Code to exchange
         -r req_id      # back channel authorization (CIBA) auth_req_id
         -D code        # Device Code to exchange
@@ -29,7 +28,8 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-p
         -b             # HTTP Basic authentication (default is POST payload)
         -U endpoint    # token endpoint URI (default is '/oauth/token')
         -k kid         # client public key jwt id
-        -f private.pem # client private key pem file for client assertion
+        -f private.pem # JWT-CA client private key PEM file for client assertion
+        -P private.pem # DPoP EC private key PEM file
         -h|?           # usage
         -v             # verbose
 
@@ -53,7 +53,7 @@ declare private_pem=''
 declare dpop_pem_file=''
 declare token_endpoint='/oauth/token'
 declare code_type='code'
-declare opt_verbose=0
+declare opt_verbose=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
@@ -123,9 +123,10 @@ EOL
 
 if [[ -n "${dpop_pem_file}" ]]; then
     dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${AUTH0_DOMAIN}${token_endpoint}")"
+    [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
 fi
 
-[[ ${opt_verbose} ]] && echo "${BODY}"
+[[ -n "${opt_verbose}" ]] && echo "${BODY}"
 
 if [[ ${http_basic} -eq 1 ]]; then
   curl --request POST \
