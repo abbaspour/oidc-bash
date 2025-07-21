@@ -129,16 +129,16 @@ fi
 [[ -n "${opt_verbose}" ]] && echo "${BODY}"
 
 if [[ ${http_basic} -eq 1 ]]; then
-  curl --request POST \
+  curl -s --request POST \
     -H "Authorization: Basic ${authorization_header}" \
     -H "${dpop_header}" \
     --url "${AUTH0_DOMAIN}${token_endpoint}" \
     --header 'content-type: application/json' \
-    --data "${BODY}"
+    --data "${BODY}" | jq .
 else
-  curl --request POST \
+  curl -s --request POST \
     -H "${dpop_header}" \
     --url "${AUTH0_DOMAIN}${token_endpoint}" \
     --header 'content-type: application/json' \
-    --data "${BODY}"
+    --data "${BODY}" | jq .
 fi
