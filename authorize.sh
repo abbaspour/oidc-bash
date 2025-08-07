@@ -27,7 +27,7 @@ declare par_path='oauth/par'
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-R response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-M mode] [-D details] [-P|-m|-C|-N|-o|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-T response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-R mode] [-D details] [-P|-m|-M|-C|-N|-o|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain
@@ -35,12 +35,12 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -x secret      # Auth0 client secret (for PAR and CIBA)
         -a audience    # Audience
         -r realm       # Connection
-        -R types       # comma separated response types (default is "${AUTH0_RESPONSE_TYPE}")
+        -T types       # comma separated response types (default is "${AUTH0_RESPONSE_TYPE}")
         -f flow        # OAuth2 flow type (implicit,code,pkce,hybrid)
         -u callback    # callback URL (default ${AUTH0_REDIRECT_URI})
         -s scopes      # comma separated list of scopes (default is "${AUTH0_SCOPE}")
         -p prompt      # prompt type: none, silent, login, consent
-        -M model       # response_mode of: web_message, form_post, fragment
+        -R mode        # response_mode of: web_message, form_post, fragment
         -S state       # state
         -n nonce       # nonce
         -H hint        # login hint (for CIBA should be JSON with sub and aud)
@@ -52,7 +52,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -k key_id      # client credentials key_id
         -K file.pem    # client credentials private key
         -D details     # authorization_details JSON format array, for RAR
-        -T protocol    # protocol to use. can be samlp, wsfed or oauth (default)
+        -L protocol    # protocol to use. can be samlp, wsfed or oauth (default)
         -g token       # send session_transfer_token as get query param
         -G token       # send session_transfer_token as get cookie param
         -P             # use PAR (pushed authorization request)
@@ -61,6 +61,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -C             # copy to clipboard
         -N             # no pretty print
         -m             # Management API audience
+        -M             # MyAccount API audience
         -F             # MFA API audience
         -O             # Open URL
         -b browser     # Choose browser to open (firefox, chrome, safari)
@@ -105,6 +106,7 @@ declare opt_clipboard=''
 declare opt_flow='implicit'
 declare opt_mgmnt=''
 declare opt_mfa_api=''
+declare opt_myaccount_api=''
 declare opt_state=''
 declare opt_nonce='mynonce'
 declare opt_login_hint=''
@@ -129,7 +131,7 @@ declare opt_verbose=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:mFCOPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:L:mMFCOPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -138,11 +140,11 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:mFCOPJN
     x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
     a) AUTH0_AUDIENCE=${OPTARG} ;;
     r) AUTH0_CONNECTION=${OPTARG} ;;
-    R) AUTH0_RESPONSE_TYPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
+    T) AUTH0_RESPONSE_TYPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     f) opt_flow=${OPTARG} ;;
     u) AUTH0_REDIRECT_URI=${OPTARG} ;;
     p) AUTH0_PROMPT=${OPTARG} ;;
-    M) AUTH0_RESPONSE_MODE=${OPTARG} ;;
+    R) AUTH0_RESPONSE_MODE=${OPTARG} ;;
     s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     S) opt_state=${OPTARG} ;;
     n) opt_nonce=${OPTARG} ;;
@@ -155,7 +157,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:mFCOPJN
     k) key_id="${OPTARG}";;
     K) key_file="${OPTARG}";;
     D) authorization_details="${OPTARG}";;
-    T) protocol="${OPTARG}";;
+    L) protocol="${OPTARG}";;
     g) opt_session_transfer_token_query="${OPTARG}";;
     G) opt_session_transfer_token_cookie="${OPTARG}";;
     C) opt_clipboard=1 ;;
@@ -165,6 +167,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:M:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:mFCOPJN
     N) opt_pp=0 ;;
     O) opt_open=1 ;;
     m) opt_mgmnt=1 ;;
+    M) opt_myaccount_api=1 ;;
     F) opt_mfa_api=1 ;;
     b) opt_browser="-a ${OPTARG} " ;;
     v) opt_verbose=1;; #set -x ;;
@@ -195,6 +198,7 @@ fi
 
 [[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/api/v2/"
 [[ -n "${opt_mfa_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/mfa/"
+[[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/me/"
 
 declare response_param=''
 

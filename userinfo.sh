@@ -8,11 +8,11 @@
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-a access_token] [-o|-h]
+USAGE: $0 [-e env] [-a access_token] [-o|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
-        -a token       # Access Token
+        -t tenant      # Auth0 tenant@region (for opaque tokens)
+        -d domain      # Auth0 domain (for opaque tokens)
+        -a token       # Access Token (default is access_token env variable)
         -h|?           # usage
         -v             # verbose
 
@@ -23,7 +23,6 @@ END
 }
 
 declare AUTH0_DOMAIN=''
-declare access_token=''
 
 declare opt_verbose=0
 
@@ -39,8 +38,14 @@ while getopts "e:t:d:a::hv?" opt; do
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
-[[ -z "${access_token}" ]] && { echo >&2 "ERROR: access_token undefined";  usage 1; }
+[[ -z "${access_token}" ]] && { echo >&2 "ERROR: access_token undefined. export access_token='PASTE' ";  usage 1; }
 
+declare -r AUTH0_DOMAIN_URL=$(jq -Rr 'split(".") | .[1] | @base64d | fromjson | .iss // empty' <<< "${access_token}")
 
-curl -s -H "Authorization: Bearer ${access_token}" "https://${AUTH0_DOMAIN}/userinfo" | jq '.'
+if [[ -z "${AUTH0_DOMAIN_URL}" ]]; then
+  [[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
+  [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+  AUTH0_DOMAIN_URL="${AUTH0_DOMAIN}/"
+fi
+
+curl -s -H "Authorization: Bearer ${access_token}" "${AUTH0_DOMAIN_URL}userinfo" | jq '.'

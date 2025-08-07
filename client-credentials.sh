@@ -14,7 +14,7 @@ command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
 
 function usage() {
   cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-i client_id] [-x client_secret] [-a audience] [-m|-v|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a audience] [-m|-v|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain or edge location
@@ -110,3 +110,5 @@ else
     --header "client-certificate-ca-verified: ${ca_signed}" \
     "https://${AUTH0_DOMAIN}/oauth/token"
 fi
+
+echo
