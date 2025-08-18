@@ -97,11 +97,13 @@ done
 
 [[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="https://${AUTH0_DOMAIN}/api/v2/"
 
+[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+
 declare secret=''
 [[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\": \"${AUTH0_CLIENT_SECRET}\","
 
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$(./client-assertion.sh -d "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  readonly assertion=$(./client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   readonly client_assertion=$(cat <<EOL
   , "client_assertion" : "${assertion}",
   "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
@@ -133,13 +135,13 @@ else
   if [[ -z "${client_certificate}" ]]; then
     curl -s -k --header 'content-type: application/json' -d "${BODY}" \
       --header "cname-api-key: ${cname_api_key}" \
-      "https://${AUTH0_DOMAIN}/oauth/token"
+      "${AUTH0_DOMAIN}/oauth/token"
   else
     curl -s -k --header 'content-type: application/json' -d "${BODY}" \
       --header "cname-api-key: ${cname_api_key}" \
       --header "client-certificate: ${client_certificate}" \
       --header "client-certificate-ca-verified: ${ca_signed}" \
-      "https://${AUTH0_DOMAIN}/oauth/token"
+      "${AUTH0_DOMAIN}/oauth/token"
   fi
 fi
 

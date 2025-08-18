@@ -30,7 +30,6 @@ The project supports various standards from the OAuth 2 family and OpenID Connec
 
 2. **Script Execution**:
    - Most scripts can be run with `./script-name.sh` and provide usage information with `-h` flag
-   - Example: `./client-assertion.sh -d yourdomain.auth0.com -i your_client_id -k your_kid -f path/to/key.pem`
 
 3. **Testing**:
    - No formal test suite is provided
@@ -41,7 +40,6 @@ The project supports various standards from the OAuth 2 family and OpenID Connec
    - `-e <file>`: Path to .env file for environment variables
    - `-v`: Verbose mode for debugging; In verbose mode, prints request URL and body to console
    - `-h`: Display help/usage information
-   - `-t tenant`: Auth0 tenant in the format of tenant@region
    - `-t tenant`: Auth0 tenant in the format of tenant@region
    - `-d domain`: fully qualified Auth0 domain
 
