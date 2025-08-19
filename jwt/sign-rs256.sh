@@ -18,7 +18,7 @@ function usage() {
 USAGE: $0 [-f json] [-i iss] [-a aud] [-k kid] [-p private-key] [-v|-h]
         -f file        # JSON file to sign
         -p pem         # private key PEM file
-        -i iss         # Issuer
+        -i iss         # issuer
         -a aud         # audience
         -k kid         # Key ID
         -A alg         # algorithm. default ${alg}
@@ -31,6 +31,9 @@ eg,
 END
     exit $1
 }
+
+b64url(){ openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+
 
 declare opt_verbose=0
 declare aud=''
@@ -54,11 +57,8 @@ while getopts "f:i:a:k:p:A:t:hv?" opt; do
     esac
 done
 
-#[[ -z "${aud}" ]] && { echo >&2 "ERROR: audience undefined."; usage 1; }
-#[[ -z "${iss}" ]] && { echo >&2 "ERROR: iss undefined."; usage 1; }
 [[ -z "${kid}" ]] && { echo >&2 "ERROR: kid undefined.";  usage 1; }
 
-#[[ -z "${pem_file}" ]] && { echo >&2 "ERROR: pem_file undefined."; usage 1; }
 [[ -f "${pem_file}" ]] || { echo >&2 "ERROR: pem_file missing: ${pem_file}"; usage 1; }
 [[ -z "${json_file}" ]] && { echo >&2 "ERROR: json_file undefined";  usage 1; }
 
@@ -66,12 +66,11 @@ done
 
 
 # header
-declare -r header=$(printf '{"typ":"%s","alg":"%s","kid":"%s"}' "${typ}" "${alg}" "${kid}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+declare -r header=$(printf '{"typ":"%s","alg":"%s","kid":"%s"}' "${typ}" "${alg}" "${kid}" | b64url)
 
 # body
-declare -r body=$(cat "${json_file}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+declare -r body=$(cat "${json_file}" | b64url)
 
-#echo "${header}.${body}"
 declare alg_lower=$(echo -n "$alg" | tr '[:upper:]' '[:lower:]')
 
 declare signature=''
@@ -80,15 +79,14 @@ if [[ ${alg_lower} != 'none' ]]; then
         # Use RSASSA-PSS padding for PS256
         signature=$(echo -n "${header}.${body}" | \
             openssl dgst -sha256 -sign "${pem_file}" -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:-1 -binary | \
-            openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+            b64url)
     else
         # Default to RS256 (or other RS algorithms with PKCS#1 v1.5 padding)
         signature=$(echo -n "${header}.${body}" | \
             openssl dgst -sha256 -sign "${pem_file}" -binary | \
-            openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+            b64url)
     fi
-    signature=".${signature}"
 fi
 
 # jwt
-echo "${header}.${body}${signature}"
+echo "${header}.${body}.${signature}"

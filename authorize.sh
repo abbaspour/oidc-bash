@@ -55,6 +55,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -L protocol    # protocol to use. can be samlp, wsfed or oauth (default)
         -g token       # send session_transfer_token as get query param
         -G token       # send session_transfer_token as get cookie param
+        -U endpoint    # authorization endpoint path (default is 'authorize')
         -P             # use PAR (pushed authorization request)
         -J             # use JAR (JWT authorization request)
         -B message     # use back channel authorize (CIBA request) with given binding message
@@ -79,7 +80,7 @@ urlencode() {
 }
 
 random32() {
-    for _ in {0..32}; do echo -n $((RANDOM % 10)); done
+    for _ in {0..45}; do echo -n $((RANDOM % 10)); done
 }
 
 base64URLEncode() {
@@ -131,7 +132,7 @@ declare opt_verbose=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:L:mMFCOPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:L:U:mMFCOPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -160,6 +161,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:L:mMFCOPJ
     L) protocol="${OPTARG}";;
     g) opt_session_transfer_token_query="${OPTARG}";;
     G) opt_session_transfer_token_cookie="${OPTARG}";;
+    U) authorization_path="${OPTARG}";;
     C) opt_clipboard=1 ;;
     P) opt_par=1 ;;
     J) opt_jar=1 ;;
@@ -180,13 +182,14 @@ done
 [[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
 
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+[[ ${AUTH0_DOMAIN} =~ /$ ]] || AUTH0_DOMAIN="${AUTH0_DOMAIN}/"
 
-declare par_endpoint="${AUTH0_DOMAIN}/${par_path}"
-declare authorization_endpoint="${AUTH0_DOMAIN}/${authorization_path}"
-declare bc_authorization_endpoint="${AUTH0_DOMAIN}/${bc_authorization_path}"
+declare par_endpoint="${AUTH0_DOMAIN}${par_path}"
+declare authorization_endpoint="${AUTH0_DOMAIN}${authorization_path}"
+declare bc_authorization_endpoint="${AUTH0_DOMAIN}${bc_authorization_path}"
 
 if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
-  declare signon_url="${AUTH0_DOMAIN}/${protocol}/${AUTH0_CLIENT_ID}"
+  declare signon_url="${AUTH0_DOMAIN}${protocol}/${AUTH0_CLIENT_ID}"
   [[ -n "${AUTH0_CONNECTION}" ]] && signon_url+="?connection=${AUTH0_CONNECTION}"
 
   echo "${signon_url}"
@@ -196,9 +199,9 @@ if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
   exit 0
 fi
 
-[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/api/v2/"
-[[ -n "${opt_mfa_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/mfa/"
-[[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/me/"
+[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}api/v2/"
+[[ -n "${opt_mfa_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}mfa/"
+[[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}me/"
 
 declare response_param=''
 
@@ -265,15 +268,16 @@ fi
 if [[ -n "${AUTH0_CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
   authorize_params+="&client_secret=${AUTH0_CLIENT_SECRET}"
 elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
-  [[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
-  [[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
-  [[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
-  readonly exp=$(date +%s --date='5 minutes')
-  readonly now=$(date +%s)
-  readonly client_assertion=$(mktemp --suffix=.json)
-  printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_ID}" "${AUTH0_DOMAIN}" "${exp}" "${now}" >> "${client_assertion}"
-  readonly signed_client_assertion=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${client_assertion}" -k "${key_id}" -t JWT -A PS256)
-  echo signed_client_assertion=$signed_client_assertion
+  readonly signed_client_assertion=$("${DIR}"/client-assertion.sh -a "${AUTH0_DOMAIN}" -f "${key_file}" -k "${key_id}" -t JWT)
+  #[[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
+  #[[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
+  #[[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
+  #readonly exp=$(date +%s --date='5 minutes')
+  #readonly now=$(date +%s)
+  #readonly client_assertion=$(mktemp --suffix=.json)
+  #printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_ID}" "${AUTH0_DOMAIN}" "${exp}" "${now}" >> "${client_assertion}"
+  #readonly signed_client_assertion=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${client_assertion}" -k "${key_id}" -t JWT -A PS256)
+  echo signed_client_assertion="$signed_client_assertion"
   authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 fi
 

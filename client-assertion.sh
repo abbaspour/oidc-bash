@@ -11,58 +11,74 @@ set -eo pipefail
 command -v openssl >/dev/null || { echo >&2 "error: openssl not found"; exit 3; }
 command -v sed >/dev/null || { echo >&2 "error: sed not found"; exit 3; }
 
+declare alg='RS256'
+declare TTL=300
 
 function usage() {
     cat <<END >&2
 USAGE: $0 [-t tenant] [-d domain] [-i client_id] [-f file] [-k kid] [-v|-h]
         -e file         # .env file location (default cwd)
-        -t tenant       # Auth0 tenant@region
-        -d domain       # Auth0 domain
+        -a audience     # audience
         -i client_id    # client_id
-        -k kid          # client key id
+        -k kid          # key id. optional.
         -f file         # private key PEM  file
+        -A alg          # algorithm. default ${alg}. supports: RS256, ES256, PS256
+        -t ttl          # TTL in seconds. default is 300
         -h|?            # usage
         -v              # verbose
 
 eg,
-     $0 -d abbaspour.auth0.com -i 6KS0YSEQwsvE9qRqtzonX8SEgJEYVzVH -k mykid -f ../ca/mydomain.local.key
+     $0 -t abbaspour -i 6KS0YSEQwsvE9qRqtzonX8SEgJEYVzVH -k mykid -f ../ca/mydomain.local.key
 END
     exit $1
 }
 
-declare AUTH0_DOMAIN=''
+declare AUDIENCE=''
 declare client_id=''
 declare pem_file=''
 declare kid=''
 
-while getopts "e:t:d:i:f:k:hv?" opt
+while getopts "e:t:a:i:f:k:A:hv?" opt
 do
     case ${opt} in
         e) source ${OPTARG};;
-        t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.');;
-        d) AUTH0_DOMAIN="${OPTARG}";;
+        a) AUDIENCE="${OPTARG}";;
         i) client_id=${OPTARG};;
         f) pem_file=${OPTARG};;
         k) kid=${OPTARG};;
+        A) alg=${OPTARG} ;;
+        t) TTL=${OPTARG} ;;
         v) set -x;;
         h|?) usage 0;;
         *) usage 1;;
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && { echo >&2 "ERROR: AUTH0_DOMAIN undefined"; usage 1; }
+
+[[ -z "${AUDIENCE}" ]] && { echo >&2 "ERROR: AUDIENCE undefined"; usage 1; }
 [[ -z "${client_id}" ]] && { echo >&2 "ERROR: client_id undefined."; usage 1; }
-[[ -z "${kid}" ]] && { echo >&2 "ERROR: kid undefined."; usage 1; }
+[[ -z "${kid}" ]] && kid='' # { echo >&2 "ERROR: kid undefined."; usage 1; }
 [[ -z "${pem_file}" ]] && { echo >&2 "ERROR: pem_file undefined."; usage 1; }
 [[ -f "${pem_file}" ]] || { echo >&2 "ERROR: pem_file missing: ${pem_file}"; usage 1; }
 
-readonly exp=$(date +%s --date='5 minutes')
-readonly now=$(date +%s)
+[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
-readonly header=$(printf '{"typ":"JWT","alg":"RS256","kid":"%s"}' "${kid}" | openssl base64 -e -A | sed s/\+/-/ | sed -E s/=+$//)
-readonly body=$(printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"https://%s/","exp":%s, "jti": "%s"}' "${now}" "${client_id}" "${client_id}" "${AUTH0_DOMAIN}" "${exp}" "${now}" | openssl base64 -e -A | sed s/\+/-/ | sed -E s/=+$//)
-readonly signature=$(echo -n "${header}.${body}" | openssl dgst -sha256 -sign "${pem_file}" -binary | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+declare ALG="${alg^^}"
 
-# jwt
-echo "${header}.${body}.${signature}"
+declare -r now=$(date +%s);
+declare -r exp=$((now + TTL));
+declare -r JTI="$(openssl rand -hex 16)"
+
+readonly body=$(printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${client_id}" "${client_id}" "${AUDIENCE}" "${exp}" "${JTI}")
+
+readonly json=$(mktemp --suffix=.json)
+
+echo "${body}" > "${json}"
+
+case "${ALG}" in
+  RS256|PS256) ./jwt/sign-rs256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}" -A "${ALG}";;
+  HS256) ./jwt/sign-hs256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}";;
+  ES256) ./jwt/sign-es256-jose.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}";;
+  *)  echo >&2 "ERROR: unsupported algorithm: ${ALG}"; usage 1;;
+esac
 
