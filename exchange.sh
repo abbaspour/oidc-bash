@@ -58,6 +58,7 @@ declare dpop_pem_file=''
 declare token_endpoint='oauth/token'
 declare code_type='code'
 declare opt_verbose=''
+declare content_type='application/json'
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
@@ -79,7 +80,7 @@ while getopts "e:t:d:c:u:a:x:X:P:D:r:U:k:K:A:bphv?" opt; do
   D) code_type='device_code'; grant_type='urn:ietf:params:oauth:grant-type:device_code'; authorization_code=${OPTARG} ;;
   r) code_type='auth_req_id'; grant_type='urn:openid:params:grant-type:ciba'; authorization_code=${OPTARG} ;;
   b) http_basic=1 ;;
-  p) form_post=1 ;;
+  p) form_post=1; content_type='application/x-www-form-urlencoded' ;;
   v) opt_verbose=1;; #set -x ;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
@@ -101,7 +102,8 @@ declare dpop_header=''
 declare assertion=''
 
 if [[ ${http_basic} -eq 1 ]]; then
-  authorization_header=$(printf "%s:%s" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_SECRET}" | openssl base64 -e -A)
+  authorization_header="Authorization: Basic "
+  authorization_header+=$(printf "%s:%s" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_SECRET}" | openssl base64 -e -A)
 else
   [[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${AUTH0_CLIENT_SECRET}\","
   [[ -n "${code_verifier}" ]] && secret+="\"code_verifier\":\"${code_verifier}\","
@@ -118,7 +120,7 @@ else
   readonly client_assertion=''
 fi
 
-declare -r BODY=$(cat <<EOL
+declare BODY=$(cat <<EOL
 {
     "client_id":"${AUTH0_CLIENT_ID}",
     ${secret}
@@ -136,44 +138,18 @@ if [[ -n "${dpop_pem_file}" ]]; then
     [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
 fi
 
+if [[ ${form_post} -eq 1 ]]; then
+  BODY=$(echo "${BODY}" | jq -r 'to_entries | map("\(.key)=\(.value|tostring|@uri)") | join("&")')
+fi
+
 # Verbose output of body
 if [[ -n "${opt_verbose}" ]]; then
   echo "${BODY}"
 fi
 
-if [[ ${form_post} -eq 1 ]]; then
-  # FORM-ENCODED request
-  readonly BODY_FORM=$(echo "${BODY}" | jq -r 'to_entries | map("\(.key)=\(.value|tostring|@uri)") | join("&")')
-  [[ -n "${opt_verbose}" ]] && echo "${BODY_FORM}"
-
-  if [[ ${http_basic} -eq 1 ]]; then
-    curl -s --request POST \
-      -H "Authorization: Basic ${authorization_header}" \
-      -H "${dpop_header}" \
-      --url "${AUTH0_DOMAIN}/${token_endpoint}" \
-      --header 'content-type: application/x-www-form-urlencoded' \
-      --data "${BODY_FORM}" | jq .
-  else
-    curl -v --request POST \
-      -H "${dpop_header}" \
-      --url "${AUTH0_DOMAIN}/${token_endpoint}" \
-      --header 'content-type: application/x-www-form-urlencoded' \
-      --data "${BODY_FORM}" | jq .
-  fi
-else
-  # JSON request (default)
-  if [[ ${http_basic} -eq 1 ]]; then
-    curl -s --request POST \
-      -H "Authorization: Basic ${authorization_header}" \
-      -H "${dpop_header}" \
-      --url "${AUTH0_DOMAIN}/${token_endpoint}" \
-      --header 'content-type: application/json' \
-      --data "${BODY}" | jq .
-  else
-    curl -s --request POST \
-      -H "${dpop_header}" \
-      --url "${AUTH0_DOMAIN}/${token_endpoint}" \
-      --header 'content-type: application/json' \
-      --data "${BODY}" | jq .
-  fi
-fi
+curl -s --request POST \
+  -H "${authorization_header}" \
+  -H "${dpop_header}" \
+  --url "${AUTH0_DOMAIN}/${token_endpoint}" \
+  --header "content-type: ${content_type}" \
+  --data "${BODY}" | jq .
