@@ -98,7 +98,6 @@ done
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
 declare token_endpoint="${AUTH0_DOMAIN}/${token_endpoint_path}"
-
 declare issuer="${AUTH0_DOMAIN}"
 [[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
@@ -108,7 +107,7 @@ declare dpop_header=''
 
 declare assertion=''
 
-# OIDC Discovery to resolve token endpoint (unless disabled via -Z)
+# OIDC Discovery to resolve token endpoint (unless disabled via -D)
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
   discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
