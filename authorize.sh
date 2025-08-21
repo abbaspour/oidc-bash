@@ -51,7 +51,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -E key=value   # additional comma separated list of key=value parameters to be sent as ext-key
         -k key_id      # client credentials key_id
         -K file.pem    # client credentials private key
-        -D details     # authorization_details JSON format array, for RAR
+        -j json        # authorization_details JSON format array, for RAR
         -L protocol    # protocol to use. can be samlp, wsfed or oauth (default)
         -g token       # send session_transfer_token as get query param
         -G token       # send session_transfer_token as get cookie param
@@ -132,7 +132,7 @@ declare opt_verbose=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:L:U:mMFCOPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:mMFCOPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -157,7 +157,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:L:U:mMFCO
     E) opt_ext_params=$(echo "${OPTARG}" | tr ',' ' ') ;;
     k) key_id="${OPTARG}";;
     K) key_file="${OPTARG}";;
-    D) authorization_details="${OPTARG}";;
+    j) authorization_details="${OPTARG}";;
     L) protocol="${OPTARG}";;
     g) opt_session_transfer_token_query="${OPTARG}";;
     G) opt_session_transfer_token_cookie="${OPTARG}";;
