@@ -15,7 +15,7 @@ declare alg='RS256'
 
 function usage() {
   cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X code_verifier] [-P dpop.pem] [-u callback] [-a authorization_code] [-p] [-v|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X code_verifier] [-P dpop.pem] [-u callback] [-a authorization_code] [-p] [-D] [-v|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain
@@ -24,7 +24,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X
         -X verifier    # PKCE code_verifier
         -a code        # Authorization Code to exchange
         -r req_id      # back channel authorization (CIBA) auth_req_id
-        -D code        # Device Code to exchange
+        -C code        # Device Code to exchange
         -u callback    # callback URL
         -U endpoint    # token endpoint URI (default is 'oauth/token')
         -k kid         # client public key JWT-CA key id
@@ -33,6 +33,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X
         -P private.pem # DPoP EC private key PEM file
         -b             # HTTP Basic authentication (default is secret in payload)
         -p             # HTTP form post (default is application/json)
+        -D             # disable OIDC discovery; use default endpoints
         -h|?           # usage
         -v             # verbose
 
@@ -55,14 +56,15 @@ declare form_post=0
 declare kid=''
 declare private_pem=''
 declare dpop_pem_file=''
-declare token_endpoint='oauth/token'
+declare token_endpoint_path='oauth/token'
 declare code_type='code'
 declare opt_verbose=''
+declare opt_disable_discovery=0
 declare content_type='application/json'
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:u:a:x:X:P:D:r:U:k:K:A:bphv?" opt; do
+while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:Dbphv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
@@ -73,12 +75,13 @@ while getopts "e:t:d:c:u:a:x:X:P:D:r:U:k:K:A:bphv?" opt; do
   a) authorization_code=${OPTARG} ;;
   X) code_verifier=${OPTARG} ;;
   P) dpop_pem_file=${OPTARG} ;;
-  U) token_endpoint=${OPTARG} ;;
+  U) token_endpoint_path=${OPTARG} ;;
   k) kid=${OPTARG} ;;
   K) private_pem=${OPTARG} ;;
   A) alg=${OPTARG} ;;
-  D) code_type='device_code'; grant_type='urn:ietf:params:oauth:grant-type:device_code'; authorization_code=${OPTARG} ;;
+  C) code_type='device_code'; grant_type='urn:ietf:params:oauth:grant-type:device_code'; authorization_code=${OPTARG} ;;
   r) code_type='auth_req_id'; grant_type='urn:openid:params:grant-type:ciba'; authorization_code=${OPTARG} ;;
+  D) opt_disable_discovery=1 ;;
   b) http_basic=1 ;;
   p) form_post=1; content_type='application/x-www-form-urlencoded' ;;
   v) opt_verbose=1;; #set -x ;;
@@ -93,13 +96,29 @@ done
 [[ -z "${authorization_code}" ]] && { echo >&2 "ERROR: authorization_code undefined"; usage 1; }
 
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
-#[[ ${AUTH0_DOMAIN} =~ /$ ]] || AUTH0_DOMAIN="${AUTH0_DOMAIN}/" # conflicts with jwt-ca audience
+
+declare token_endpoint="${AUTH0_DOMAIN}/${token_endpoint_path}"
+
+declare issuer="${AUTH0_DOMAIN}"
+[[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
 declare secret=''
 declare authorization_header=''
 declare dpop_header=''
 
 declare assertion=''
+
+# OIDC Discovery to resolve token endpoint (unless disabled via -Z)
+if [[ ${opt_disable_discovery} -eq 0 ]]; then
+  declare discovery_json
+  discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
+
+  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+
+  [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
+  [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
+fi
 
 if [[ ${http_basic} -eq 1 ]]; then
   authorization_header="Authorization: Basic "
@@ -110,7 +129,7 @@ else
 fi
 
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$(./client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
+  readonly assertion=$(./client-assertion.sh -a "${issuer}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
   readonly client_assertion=$(cat <<EOL
     , "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
     "client_assertion" : "${assertion}"
@@ -134,7 +153,7 @@ EOL
 )
 
 if [[ -n "${dpop_pem_file}" ]]; then
-    dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${AUTH0_DOMAIN}${token_endpoint}")"
+    dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}")"
     [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
 fi
 
@@ -150,6 +169,6 @@ fi
 curl -s --request POST \
   -H "${authorization_header}" \
   -H "${dpop_header}" \
-  --url "${AUTH0_DOMAIN}/${token_endpoint}" \
+  --url "${token_endpoint}" \
   --header "content-type: ${content_type}" \
   --data "${BODY}" | jq .
