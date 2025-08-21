@@ -37,6 +37,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p pass
         -k kid         # client public key jwt id
         -f private.pem # client private key pem file
         -C cert.pem    # client certificate for mTLS
+        -D             # disable OIDC discovery; use default endpoints
         -h|?           # usage
         -v             # verbose
 
@@ -62,6 +63,9 @@ declare kid=''
 declare private_pem=''
 declare ca_signed='FAILED: self signed certificate'
 declare client_certificate=''
+
+declare token_endpoint_path='oauth/token'
+declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
@@ -99,11 +103,27 @@ done
 
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
+declare token_endpoint="${AUTH0_DOMAIN}/${token_endpoint_path}"
+declare issuer="${AUTH0_DOMAIN}"
+[[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
+
+# OIDC Discovery to resolve token endpoint (unless disabled via -D)
+if [[ ${opt_disable_discovery} -eq 0 ]]; then
+  declare discovery_json
+  discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
+
+  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+
+  [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
+  [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
+fi
+
 declare secret=''
 [[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\": \"${AUTH0_CLIENT_SECRET}\","
 
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$(./client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  readonly assertion=$(./client-assertion.sh -a "${issuer}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   readonly client_assertion=$(cat <<EOL
   , "client_assertion" : "${assertion}",
   "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
@@ -130,18 +150,18 @@ EOL
 # --header "true-client-ip: 20.30.40.50" \
 
 if [[ -z "${cname_api_key}"  ]]; then
-  curl -s -k --header 'content-type: application/json' -d "${BODY}" "https://${AUTH0_DOMAIN}/oauth/token"
+  curl -s -k --header 'content-type: application/json' -d "${BODY}" --url "${token_endpoint}"
 else
   if [[ -z "${client_certificate}" ]]; then
     curl -s -k --header 'content-type: application/json' -d "${BODY}" \
       --header "cname-api-key: ${cname_api_key}" \
-      "${AUTH0_DOMAIN}/oauth/token"
+      --url "${token_endpoint}"
   else
     curl -s -k --header 'content-type: application/json' -d "${BODY}" \
       --header "cname-api-key: ${cname_api_key}" \
       --header "client-certificate: ${client_certificate}" \
       --header "client-certificate-ca-verified: ${ca_signed}" \
-      "${AUTH0_DOMAIN}/oauth/token"
+      --url "${token_endpoint}"
   fi
 fi
 

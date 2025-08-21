@@ -27,7 +27,7 @@ declare par_path='oauth/par'
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-T response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-R mode] [-D details] [-P|-m|-M|-C|-N|-o|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-T response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-R mode] [-D] [-P|-m|-M|-C|-N|-o|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain
@@ -51,11 +51,12 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -E key=value   # additional comma separated list of key=value parameters to be sent as ext-key
         -k key_id      # client credentials key_id
         -K file.pem    # client credentials private key
-        -D details     # authorization_details JSON format array, for RAR
+        -j json        # authorization_details JSON format array, for RAR
         -L protocol    # protocol to use. can be samlp, wsfed or oauth (default)
         -g token       # send session_transfer_token as get query param
         -G token       # send session_transfer_token as get cookie param
         -U endpoint    # authorization endpoint path (default is 'authorize')
+        -D             # disable OIDC discovery; use default endpoints derived from -d/-t and -U
         -P             # use PAR (pushed authorization request)
         -J             # use JAR (JWT authorization request)
         -B message     # use back channel authorize (CIBA request) with given binding message
@@ -129,10 +130,11 @@ declare opt_ext_params=''
 declare opt_session_transfer_token_query=''
 declare opt_session_transfer_token_cookie=''
 declare opt_verbose=0
+declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:L:U:mMFCOPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -157,11 +159,12 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:D:T:g:G:B:L:U:mMFCO
     E) opt_ext_params=$(echo "${OPTARG}" | tr ',' ' ') ;;
     k) key_id="${OPTARG}";;
     K) key_file="${OPTARG}";;
-    D) authorization_details="${OPTARG}";;
+    j) authorization_details="${OPTARG}";;
     L) protocol="${OPTARG}";;
     g) opt_session_transfer_token_query="${OPTARG}";;
     G) opt_session_transfer_token_cookie="${OPTARG}";;
     U) authorization_path="${OPTARG}";;
+    D) opt_disable_discovery=1 ;;
     C) opt_clipboard=1 ;;
     P) opt_par=1 ;;
     J) opt_jar=1 ;;
@@ -182,14 +185,36 @@ done
 [[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
 
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
-[[ ${AUTH0_DOMAIN} =~ /$ ]] || AUTH0_DOMAIN="${AUTH0_DOMAIN}/"
 
-declare par_endpoint="${AUTH0_DOMAIN}${par_path}"
-declare authorization_endpoint="${AUTH0_DOMAIN}${authorization_path}"
-declare bc_authorization_endpoint="${AUTH0_DOMAIN}${bc_authorization_path}"
+declare issuer="${AUTH0_DOMAIN}"
+[[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
+
+# Default endpoints derived from domain and paths
+declare par_endpoint="${AUTH0_DOMAIN}/${par_path}"
+declare authorization_endpoint="${AUTH0_DOMAIN}/${authorization_path}"
+declare bc_authorization_endpoint="${AUTH0_DOMAIN}/${bc_authorization_path}"
+
+# OIDC Discovery (unless disabled with -D)
+if [[ ${opt_disable_discovery} -eq 0 ]]; then
+    # Use -k to allow dev environments with self-signed; consistent with later curl usage
+    declare discovery_json
+    discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
+
+    # Extract fields if present
+    d_authz=$(echo "${discovery_json}" | jq -r '.authorization_endpoint // empty')
+    d_par=$(echo "${discovery_json}" | jq -r '.pushed_authorization_request_endpoint // empty')
+    d_ciba=$(echo "${discovery_json}" | jq -r '.backchannel_authentication_endpoint // empty')
+    d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+
+    # Override defaults when discovery provides values
+    [[ -n "${d_authz}" ]] && authorization_endpoint="${d_authz}"
+    [[ -n "${d_par}" ]] && par_endpoint="${d_par}"
+    [[ -n "${d_ciba}" ]] && bc_authorization_endpoint="${d_ciba}"
+    [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
+fi
 
 if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
-  declare signon_url="${AUTH0_DOMAIN}${protocol}/${AUTH0_CLIENT_ID}"
+  declare signon_url="${AUTH0_DOMAIN}/${protocol}/${AUTH0_CLIENT_ID}"
   [[ -n "${AUTH0_CONNECTION}" ]] && signon_url+="?connection=${AUTH0_CONNECTION}"
 
   echo "${signon_url}"
@@ -199,9 +224,9 @@ if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
   exit 0
 fi
 
-[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}api/v2/"
-[[ -n "${opt_mfa_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}mfa/"
-[[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}me/"
+[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/api/v2/"
+[[ -n "${opt_mfa_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/mfa/"
+[[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/me/"
 
 declare response_param=''
 
@@ -257,8 +282,7 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
                                }' >> "${tmp_jwt}"
   readonly jar_exp=$(date +%s --date='5 minutes')
   readonly jar_now=$(date +%s)
-  echo "\"aud\": \"${AUTH0_DOMAIN}\", \"iat\": ${jar_now}, \"exp\": ${jar_exp}, \"nbf\": ${jar_now} }"  >> "${tmp_jwt}"
-  #cat "${tmp_jwt}"
+  echo "\"aud\": \"${issuer}\", \"iat\": ${jar_now}, \"exp\": ${jar_exp}, \"nbf\": ${jar_now} }"  >> "${tmp_jwt}"
   signed_request=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${tmp_jwt}" -k "${key_id}" -t oauth-authz-req+jwt -A PS256)
   readonly signed_request
   echo "$signed_request"
@@ -268,16 +292,7 @@ fi
 if [[ -n "${AUTH0_CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
   authorize_params+="&client_secret=${AUTH0_CLIENT_SECRET}"
 elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
-  readonly signed_client_assertion=$("${DIR}"/client-assertion.sh -a "${AUTH0_DOMAIN}" -f "${key_file}" -k "${key_id}" -t JWT)
-  #[[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
-  #[[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
-  #[[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
-  #readonly exp=$(date +%s --date='5 minutes')
-  #readonly now=$(date +%s)
-  #readonly client_assertion=$(mktemp --suffix=.json)
-  #printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_ID}" "${AUTH0_DOMAIN}" "${exp}" "${now}" >> "${client_assertion}"
-  #readonly signed_client_assertion=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${client_assertion}" -k "${key_id}" -t JWT -A PS256)
-  echo signed_client_assertion="$signed_client_assertion"
+  declare -r signed_client_assertion=$("${DIR}"/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
   authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 fi
 

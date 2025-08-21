@@ -22,6 +22,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-r
         -r token       # refresh_token
         -s scopes      # comma separated list of scopes
         -g             # enable session_transfer audience for native to web
+        -D             # disable OIDC discovery; use default endpoints
         -h|?           # usage
         -v             # verbose
 
@@ -38,10 +39,12 @@ declare opt_verbose=''
 declare refresh_token=''
 declare AUTH0_SCOPE=''
 declare enable_session_transfer=0
+declare token_endpoint_path='oauth/token'
+declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:r:x:s:ghv?" opt; do
+while getopts "e:t:d:c:r:x:s:Dghv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -50,6 +53,7 @@ while getopts "e:t:d:c:r:x:s:ghv?" opt; do
     x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
     r) refresh_token=${OPTARG} ;;
     s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
+    D) opt_disable_discovery=1 ;;
     g) enable_session_transfer=1 ;;
     v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
@@ -59,9 +63,18 @@ done
 
 [[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
 [[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
-
 [[ -z "${refresh_token}" ]] && { echo >&2 "ERROR: refresh_token undefined";  usage 1; }
 
+[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+declare token_endpoint="${AUTH0_DOMAIN}/${token_endpoint_path}"
+
+# OIDC Discovery to resolve token endpoint (unless disabled via -D)
+if [[ ${opt_disable_discovery} -eq 0 ]]; then
+  declare discovery_json
+  discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
+  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
+fi
 
 declare secret=''
 [[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${AUTH0_CLIENT_SECRET}\","
@@ -87,7 +100,7 @@ EOL
 [[ "${opt_verbose}" ]] && echo "${BODY}"
 
 curl -s --request POST \
-    --url "https://${AUTH0_DOMAIN}/oauth/token" \
+    --url "${token_endpoint}" \
     --header 'content-type: application/json' \
     --data "${BODY}" | jq .
 
