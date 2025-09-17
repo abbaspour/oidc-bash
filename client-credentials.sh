@@ -14,7 +14,7 @@ command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
 
 function usage() {
   cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a audience] [-m|-v|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a audience] [-m|-O|-v|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain or edge location
@@ -25,6 +25,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a
         -k kid         # client public key jwt id
         -f private.pem # client private key pem file
         -m             # Management API audience
+        -O             # MyOrg API audience
         -n api_key     # cname_api_key
         -C cert.pem    # client certificate for mTLS
         -S             # mark request as CA signed
@@ -41,6 +42,7 @@ declare AUTH0_DOMAIN=''
 declare AUTH0_CLIENT_ID=''
 declare AUTH0_CLIENT_SECRET=''
 declare AUTH0_AUDIENCE=''
+declare AUTH0_ORGANIZATION=''
 declare secret=''
 declare organization=''
 declare kid=''
@@ -50,10 +52,11 @@ declare cname_api_key=''
 declare client_certificate=''
 declare ca_signed='FAILED: self signed certificate'
 declare opt_mgmnt=''
+declare opt_myorg=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:a:o:x:k:f:n:C:Smhv?" opt; do
+while getopts "e:t:d:c:a:o:x:k:f:n:C:OSmhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -61,13 +64,14 @@ while getopts "e:t:d:c:a:o:x:k:f:n:C:Smhv?" opt; do
   c) AUTH0_CLIENT_ID=${OPTARG} ;;
   x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
   a) AUTH0_AUDIENCE=${OPTARG} ;;
-  o) organization="\"organization\": \"${OPTARG}\", " ;;
+  o) AUTH0_ORGANIZATION=${OPTARG} ;;
   k) kid=${OPTARG} ;;
   f) private_pem=${OPTARG} ;;
   n) cname_api_key=${OPTARG} ;;
   C) client_certificate=$(jq -sRr @uri "${OPTARG}") ;;
   S) ca_signed='SUCCESS' ;;
   m) opt_mgmnt=1 ;;
+  O) opt_myorg=1 ;;
   v) set -x ;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
@@ -81,12 +85,13 @@ done
 [[ ${AUTH0_DOMAIN} =~ /$ ]] || AUTH0_DOMAIN="${AUTH0_DOMAIN}/"
 
 [[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${AUTH0_CLIENT_SECRET}\","
-[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="https://${AUTH0_DOMAIN}/api/v2/"
+[[ -n "${AUTH0_ORGANIZATION}" ]] && organization="\"organization\":\"${AUTH0_ORGANIZATION}\","
 
-#[[ -z "${AUTH0_AUDIENCE}" ]] && { echo >&2 "ERROR: AUTH0_AUDIENCE undefined"; usage 1; }
+[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}api/v2/"
+[[ -n "${opt_myorg}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}my-org/"
 
-if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$(./client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+if [[ -n "${private_pem}" ]]; then
+  readonly assertion=$("${DIR}"/client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   client_assertion=$(
     cat <<EOL
   , "client_assertion" : "${assertion}",
@@ -105,13 +110,13 @@ EOL
 )
 
 if [[ -z "${cname_api_key}"  ]]; then
-  curl -s -k --header 'content-type: application/json' -d "${BODY}" "${AUTH0_DOMAIN}oauth/token"
+  curl -s -k --header 'content-type: application/json' -d "${BODY}" "${AUTH0_DOMAIN}oauth/token" | jq .
 else
   curl -s -k --header 'content-type: application/json' -d "${BODY}" \
     --header "cname-api-key: ${cname_api_key}" \
     --header "client-certificate: ${client_certificate}" \
     --header "client-certificate-ca-verified: ${ca_signed}" \
-    "${AUTH0_DOMAIN}oauth/token"
+    "${AUTH0_DOMAIN}oauth/token" | jq .
 fi
 
 echo

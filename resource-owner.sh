@@ -18,7 +18,7 @@ declare AUTH0_CONNECTION='Username-Password-Authentication'
 
 function usage() {
   cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p password] [-x client_secret] [-a audience] [-r connection] [-s scope] [-i IP] [-m|-h|-v]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p password] [-x client_secret] [-a audience] [-r connection] [-s scope] [-i IP] [-m|-M|-O|-h|-v]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain
@@ -32,7 +32,9 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p pass
         -i IP          # set origin IP header. Default is 'x-forwarded-for'
         -n api_key     # cname-api-key
         -A             # switch to 'auth0-forwarded-for' for trust IP header
-        -m             # Management API audience
+        -M             # Management API audience
+        -m             # MyAccount API audience
+        -O             # MyOrg API audience
         -S             # mark request as CA signed
         -k kid         # client public key jwt id
         -f private.pem # client private key pem file
@@ -59,6 +61,8 @@ declare origin_ip='1.2.3.4'
 
 declare ff_prefix='x'
 declare opt_mgmnt=''
+declare opt_myaccount_api=''
+declare opt_myorg_api=''
 declare kid=''
 declare private_pem=''
 declare ca_signed='FAILED: self signed certificate'
@@ -69,7 +73,7 @@ declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:SAmhv?" opt; do
+while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:SAmMOhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
@@ -88,7 +92,9 @@ while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:SAmhv?" opt; do
   A) ff_prefix='auth0' ;;
   C) client_certificate=$(jq -sRr @uri "${OPTARG}") ;;
   S) ca_signed='SUCCESS' ;;
-  m) opt_mgmnt=1 ;;
+  M) opt_mgmnt=1 ;;
+  m) opt_myaccount_api=1 ;;
+  O) opt_myorg_api=1 ;;
   v) set -x ;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
@@ -99,9 +105,12 @@ done
 [[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined"; usage 1; }
 [[ -z "${username}" ]] && { echo >&2 "ERROR: username undefined"; usage 1; }
 
-[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="https://${AUTH0_DOMAIN}/api/v2/"
-
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+
+[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="https://${AUTH0_DOMAIN}/api/v2/"
+[[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/me/"
+[[ -n "${opt_myorg_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/my-org/"
+
 
 declare token_endpoint="${AUTH0_DOMAIN}/${token_endpoint_path}"
 declare issuer="${AUTH0_DOMAIN}"
@@ -150,18 +159,18 @@ EOL
 # --header "true-client-ip: 20.30.40.50" \
 
 if [[ -z "${cname_api_key}"  ]]; then
-  curl -s -k --header 'content-type: application/json' -d "${BODY}" --url "${token_endpoint}"
+  curl -s -k --header 'content-type: application/json' -d "${BODY}" --url "${token_endpoint}" | jq .
 else
   if [[ -z "${client_certificate}" ]]; then
     curl -s -k --header 'content-type: application/json' -d "${BODY}" \
       --header "cname-api-key: ${cname_api_key}" \
-      --url "${token_endpoint}"
+      --url "${token_endpoint}" | jq .
   else
     curl -s -k --header 'content-type: application/json' -d "${BODY}" \
       --header "cname-api-key: ${cname_api_key}" \
       --header "client-certificate: ${client_certificate}" \
       --header "client-certificate-ca-verified: ${ca_signed}" \
-      --url "${token_endpoint}"
+      --url "${token_endpoint}" | jq .
   fi
 fi
 

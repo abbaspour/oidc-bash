@@ -13,13 +13,14 @@ readonly DIR=$(dirname "${BASH_SOURCE[0]}")
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-r refresh_token] [-s scopes] [-g] [-v|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-r refresh_token] [-s scopes] [-a audience] [-g] [-v|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain
         -c client_id   # Auth0 client ID
         -x secret      # Auth0 client secret (optional for public clients)
         -r token       # refresh_token
+        -a audience    # Audience (for MRRT)
         -s scopes      # comma separated list of scopes
         -g             # enable session_transfer audience for native to web
         -D             # disable OIDC discovery; use default endpoints
@@ -35,6 +36,7 @@ END
 declare AUTH0_DOMAIN=''
 declare AUTH0_CLIENT_ID=''
 declare AUTH0_CLIENT_SECRET=''
+declare AUTH0_AUDIENCE=''
 declare opt_verbose=''
 declare refresh_token=''
 declare AUTH0_SCOPE=''
@@ -44,7 +46,7 @@ declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:r:x:s:Dghv?" opt; do
+while getopts "e:t:d:c:r:a:x:s:Dghv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -52,6 +54,7 @@ while getopts "e:t:d:c:r:x:s:Dghv?" opt; do
     c) AUTH0_CLIENT_ID=${OPTARG} ;;
     x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
     r) refresh_token=${OPTARG} ;;
+    a) AUTH0_AUDIENCE=${OPTARG} ;;
     s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     D) opt_disable_discovery=1 ;;
     g) enable_session_transfer=1 ;;
@@ -83,6 +86,8 @@ declare scope=''
 [[ -n "${AUTH0_SCOPE}" ]] && scope="\"scope\":\"${AUTH0_SCOPE}\","
 
 declare audience=''
+[[ -n "${AUTH0_AUDIENCE}" ]] && audience="\"audience\":\"${AUTH0_AUDIENCE}\","
+
 [[ ${enable_session_transfer} -eq 1 ]] && audience="\"audience\":\"urn:${AUTH0_DOMAIN}:session_transfer\","
 
 declare BODY=$(cat <<EOL

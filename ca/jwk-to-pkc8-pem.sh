@@ -29,7 +29,7 @@ declare output_file='output-pkcs8.pem'
 
 while getopts "i:o:hv?" opt; do
     case ${opt} in
-    o) input_file=${OPTARG} ;;
+    i) input_file=${OPTARG} ;;
     o) output_file=${OPTARG} ;;
     v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;

@@ -57,8 +57,6 @@ while getopts "f:i:a:k:p:A:t:hv?" opt; do
     esac
 done
 
-[[ -z "${kid}" ]] && { echo >&2 "ERROR: kid undefined.";  usage 1; }
-
 [[ -f "${pem_file}" ]] || { echo >&2 "ERROR: pem_file missing: ${pem_file}"; usage 1; }
 [[ -z "${json_file}" ]] && { echo >&2 "ERROR: json_file undefined";  usage 1; }
 
@@ -66,7 +64,17 @@ done
 
 
 # header
-declare -r header=$(printf '{"typ":"%s","alg":"%s","kid":"%s"}' "${typ}" "${alg}" "${kid}" | b64url)
+readonly header=$(
+  jq -n \
+    --arg typ "${typ}" \
+    --arg alg "${alg}" \
+    --arg kid "${kid:-}" \
+    '
+    { typ: $typ }
+    + { alg: $alg }
+    + ( if ($kid | length) > 0 then { kid: $kid } else {} end )
+    ' | b64url
+)
 
 # body
 declare -r body=$(cat "${json_file}" | b64url)

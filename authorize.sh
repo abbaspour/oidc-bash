@@ -62,11 +62,10 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -B message     # use back channel authorize (CIBA request) with given binding message
         -C             # copy to clipboard
         -N             # no pretty print
-        -m             # Management API audience
-        -M             # MyAccount API audience
+        -m             # MyAccount API audience
+        -M             # Management API audience
+        -O             # MyOrg API audience
         -F             # MFA API audience
-        -O             # Open URL
-        -b browser     # Choose browser to open (firefox, chrome, safari)
         -h|?           # usage
         -v             # verbose
 
@@ -103,12 +102,12 @@ declare AUTH0_CONNECTION=''
 declare AUTH0_AUDIENCE=''
 declare AUTH0_PROMPT=''
 
-declare opt_open=''
 declare opt_clipboard=''
 declare opt_flow='implicit'
 declare opt_mgmnt=''
 declare opt_mfa_api=''
 declare opt_myaccount_api=''
+declare opt_myorg_api=''
 declare opt_state=''
 declare opt_nonce='mynonce'
 declare opt_login_hint=''
@@ -118,7 +117,6 @@ declare ui_locales=''
 declare invitation=''
 declare key_id=''
 declare key_file=''
-declare opt_browser=''
 declare authorization_details=''
 declare protocol='oauth'
 declare opt_pp=1
@@ -134,7 +132,7 @@ declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -170,11 +168,10 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:b:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFC
     J) opt_jar=1 ;;
     B) opt_ciba=1; opt_binding_message="${OPTARG}" ;;
     N) opt_pp=0 ;;
-    O) opt_open=1 ;;
-    m) opt_mgmnt=1 ;;
-    M) opt_myaccount_api=1 ;;
+    M) opt_mgmnt=1 ;;
+    m) opt_myaccount_api=1 ;;
+    O) opt_myorg_api=1 ;;
     F) opt_mfa_api=1 ;;
-    b) opt_browser="-a ${OPTARG} " ;;
     v) opt_verbose=1;; #set -x ;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
@@ -219,7 +216,6 @@ if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
 
   echo "${signon_url}"
   [[ -n "${opt_clipboard}" ]] && echo "${signon_url}" | pbcopy
-  [[ -n "${opt_open}" ]] && open ${opt_browser} "${signon_url}"
 
   exit 0
 fi
@@ -227,6 +223,7 @@ fi
 [[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/api/v2/"
 [[ -n "${opt_mfa_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/mfa/"
 [[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/me/"
+[[ -n "${opt_myorg_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/my-org/"
 
 declare response_param=''
 
@@ -336,4 +333,3 @@ else
 fi
 
 [[ -n "${opt_clipboard}" ]] && echo "${authorize_url}" | pbcopy
-[[ -n "${opt_open}" ]] && open ${opt_browser} "${authorize_url}"
