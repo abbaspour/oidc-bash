@@ -15,6 +15,7 @@ You'll see some code duplicate all authenticating against token endpoint however
 - [OAuth 2.0 Pushed Authorization Requests (PAR)](https://datatracker.ietf.org/doc/html/rfc9126)
 - [OAuth 2.0 JWT-Secured Authorization Request (JAR)](https://datatracker.ietf.org/doc/html/rfc9101) 
 - [OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer (DPoP)](https://datatracker.ietf.org/doc/html/rfc9449)
+- [OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)
 
 ## OIDC Family
 - [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
