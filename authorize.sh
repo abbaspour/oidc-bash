@@ -242,6 +242,12 @@ pkce | hybrid)
     ;;
 esac
 
+# CIBA login_hint in iss_sub format
+if [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
+  [[ -z "${opt_login_hint}" ]] && { echo >&2 "login_hint required for CIBA"; exit 1; }
+  opt_login_hint=$(printf '{"format": "iss_sub", "iss": "%s", "sub": "%s"}'  "${issuer}" "${opt_login_hint}")
+fi
+
 
 # shellcheck disable=SC2155
 declare authorize_params="client_id=${AUTH0_CLIENT_ID}&${response_param}&nonce=$(urlencode ${opt_nonce})&redirect_uri=$(urlencode ${AUTH0_REDIRECT_URI})&scope=$(urlencode "${AUTH0_SCOPE}")"
@@ -312,7 +318,7 @@ elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
   readonly curl='/opt/homebrew/opt/curl/bin/curl'
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
-  declare -r auth_req_id=$("${curl}" -s -k --header "accept: application/json" --url "${bc_authorization_endpoint}" \
+  declare -r auth_req_id=$("${curl}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
     -d "${authorize_params}" | jq -r '.auth_req_id')
 
   echo "auth_req_id: ${auth_req_id}"

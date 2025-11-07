@@ -23,8 +23,10 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-i
         -c client_id          # Auth0 client ID
         -x secret             # Auth0 client secret
         -i subject_token      # Subject token
+        -R refresh_token      # Subject token of type refresh_token
+        -A access_token       # Subject token of type access_token
         -T type               # subject_token type, e.g. http://acme.com/legacy-token
-        -A audience           # Audience
+        -a audience           # Audience
         -s scopes             # comma separated list of scopes (default is "${AUTH0_SCOPE}")
         -I                    # mark subject_token is id_token
         -f                    # Token Vault mode. sets grant_type to FCAT
@@ -53,20 +55,21 @@ declare opt_verbose=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:A:i:a:T:s:r:fhv?" opt; do
+while getopts "e:t:d:c:x:A:i:a:T:s:r:R:a:fhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
     d) AUTH0_DOMAIN=${OPTARG} ;;
     c) AUTH0_CLIENT_ID=${OPTARG} ;;
     x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
-    A) AUTH0_AUDIENCE=${OPTARG} ;;
+    a) AUTH0_AUDIENCE=${OPTARG} ;;
     i) subject_token=${OPTARG} ;;
+    R) subject_token=${OPTARG}; subject_token_type='urn:ietf:params:oauth:token-type:refresh_token';;
+    A) subject_token=${OPTARG}; subject_token_type='urn:ietf:params:oauth:token-type:access_token';;
     T) subject_token_type=${OPTARG} ;;
     s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     f) grant_type='urn:auth0:params:oauth:grant-type:token-exchange:federated-connection-access-token';
        requested_token_type='"requested_token_type": "http://auth0.com/oauth/token-type/federated-connection-access-token", ';
-       subject_token_type='urn:ietf:params:oauth:token-type:refresh_token';
        ;;
     r) realm="\"connection\": \"${OPTARG}\", ";;
     v) set -x;;
