@@ -73,7 +73,7 @@ declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:SAmMOhv?" opt; do
+while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:DSAmMOhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
@@ -95,6 +95,7 @@ while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:SAmMOhv?" opt; do
   M) opt_mgmnt=1 ;;
   m) opt_myaccount_api=1 ;;
   O) opt_myorg_api=1 ;;
+  D) opt_disable_discovery=1 ;;
   v) set -x ;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
