@@ -95,6 +95,9 @@ gen_code_challenge() {
     base64URLEncode "$(echo -n "$1" | openssl dgst -binary -sha256)"
 }
 
+#declare -r CURL='/opt/homebrew/opt/curl/bin/curl'
+declare -r CURL='curl'
+
 declare AUTH0_DOMAIN=''
 declare AUTH0_CLIENT_ID=''
 declare AUTH0_CLIENT_SECRET=''
@@ -195,7 +198,7 @@ declare bc_authorization_endpoint="${AUTH0_DOMAIN}/${bc_authorization_path}"
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
     # Use -k to allow dev environments with self-signed; consistent with later curl usage
     declare discovery_json
-    discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
+    discovery_json=$(${CURL} -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
 
     # Extract fields if present
     d_authz=$(echo "${discovery_json}" | jq -r '.authorization_endpoint // empty')
@@ -300,13 +303,11 @@ elif [[ -n "${key_id}" ]]; then                                                #
 fi
 
 if [[ ${opt_par} -ne 0 ]]; then                       # PAR
-  #command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
-  readonly curl='/opt/homebrew/opt/curl/bin/curl'
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
   #  --tlsv1.2 --cert transport.pem --key transport.key --cacert connectid-sandbox-ca.pem
   #  --header "x-fapi-interaction-id: $(random32)" \
-  declare -r request_uri=$("${curl}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
+  declare -r request_uri=$("${CURL}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
     -d "${authorize_params}" | jq -r '.request_uri')
   authorize_params="client_id=${AUTH0_CLIENT_ID}&request_uri=${request_uri}"
 
@@ -315,10 +316,9 @@ elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
   [[ -z "${opt_binding_message}" ]] && { echo >&2 "opt_binding_message required for CIBA"; exit 1; }
   authorize_params+="&binding_message=$(urlencode "${opt_binding_message}")"
 
-  readonly curl='/opt/homebrew/opt/curl/bin/curl'
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
-  declare -r auth_req_id=$("${curl}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
+  declare -r auth_req_id=$("${CURL}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
     -d "${authorize_params}" | jq -r '.auth_req_id')
 
   echo "auth_req_id: ${auth_req_id}"
@@ -328,7 +328,7 @@ fi
 declare authorize_url="${authorization_endpoint}?${authorize_params}"
 
 if [[ -n "${opt_session_transfer_token_cookie}" ]]; then
-  curl --cookie "auth0_session_transfer_token=${opt_session_transfer_token_cookie}" "${authorize_url}"
+  ${CURL} --cookie "auth0_session_transfer_token=${opt_session_transfer_token_cookie}" "${authorize_url}"
 fi
 
 if [[ ${opt_pp} -eq 0 ]]; then
