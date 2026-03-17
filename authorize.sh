@@ -51,7 +51,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -E key=value   # additional comma separated list of key=value parameters to be sent as ext-key
         -k key_id      # client credentials key_id
         -K file.pem    # client credentials private key
-        -j json        # authorization_details JSON format array, for RAR
+        -j file        # path to file containing authorization_details JSON format array, for RAR
         -L protocol    # protocol to use. can be samlp, wsfed or oauth (default)
         -g token       # send session_transfer_token as get query param
         -G token       # send session_transfer_token as get cookie param
@@ -183,6 +183,15 @@ done
 
 [[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
 [[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
+
+# Read authorization_details from file if provided
+if [[ -n "${authorization_details}" ]]; then
+    [[ ! -f "${authorization_details}" ]] && {
+        echo >&2 "ERROR: authorization_details file not found: ${authorization_details}";
+        exit 1;
+    }
+    authorization_details=$(jq -c . "${authorization_details}")
+fi
 
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
