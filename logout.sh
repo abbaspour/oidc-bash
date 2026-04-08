@@ -59,7 +59,7 @@ done
 
 [[ -z ${AUTH0_DOMAIN+x} ]] && {
   if [[ -n "${id_token_hint}" ]]; then
-      AUTH0_DOMAIN=$(jq -Rr 'split(".") | .[1] | @base64d | fromjson | .iss' <<<"${id_token_hint}")
+      AUTH0_DOMAIN=$(jq -Rr 'split(".")[1] | gsub("-";"+") | gsub("_";"/") | gsub("%3D";"=") | @base64d | fromjson | .iss' <<<"${id_token_hint}")
   else
     echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;
   fi
