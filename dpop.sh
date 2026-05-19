@@ -17,6 +17,7 @@ OPENSSL_CMD="/opt/homebrew/bin/openssl"
 
 # --- Default Values ---
 METHOD="POST"
+NONCE=""
 
 # --- Function Definitions ---
 
@@ -33,7 +34,7 @@ fail() {
 }
 
 # --- Argument Parsing with getopts ---
-while getopts ":r:m:u:" opt; do
+while getopts ":r:m:u:n:" opt; do
   case ${opt} in
     r )
       PRIVATE_KEY_FILE=$OPTARG
@@ -43,6 +44,9 @@ while getopts ":r:m:u:" opt; do
       ;;
     u )
       URL=$OPTARG
+      ;;
+    n )
+      NONCE=$OPTARG
       ;;
     \? )
       fail "Invalid option: -$OPTARG"
@@ -111,7 +115,9 @@ ENCODED_HEADER=$(echo -n "${HEADER}" | base64url_encode)
 # the HTTP URI (htu), and the issued-at timestamp (iat).
 JTI=$(${OPENSSL_CMD} rand -hex 16)
 IAT=$(date +%s)
-PAYLOAD="{\"jti\":\"${JTI}\",\"htm\":\"${METHOD}\",\"htu\":\"${URL}\",\"iat\":${IAT}}"
+NONCE_CLAIM=""
+[[ -n "${NONCE}" ]] && NONCE_CLAIM=",\"nonce\":\"${NONCE}\""
+PAYLOAD="{\"jti\":\"${JTI}\",\"htm\":\"${METHOD}\",\"htu\":\"${URL}\",\"iat\":${IAT}${NONCE_CLAIM}}"
 ENCODED_PAYLOAD=$(echo -n "${PAYLOAD}" | base64url_encode)
 
 # 5. Create the Signing Input

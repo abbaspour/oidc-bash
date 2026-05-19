@@ -165,9 +165,36 @@ if [[ -n "${opt_verbose}" ]]; then
   echo "${BODY}"
 fi
 
-curl -s --request POST \
-  -H "${authorization_header}" \
-  -H "${dpop_header}" \
-  --url "${token_endpoint}" \
-  --header "content-type: ${content_type}" \
-  --data "${BODY}" | jq .
+if [[ -n "${dpop_pem_file}" ]]; then
+  declare _dpop_hdr_file
+  _dpop_hdr_file=$(mktemp)
+  declare _dpop_body
+  _dpop_body=$(curl -s -D "${_dpop_hdr_file}" --request POST \
+    -H "${authorization_header}" \
+    -H "${dpop_header}" \
+    --url "${token_endpoint}" \
+    --header "content-type: ${content_type}" \
+    --data "${BODY}")
+  declare _dpop_nonce
+  _dpop_nonce=$(grep -i '^dpop-nonce:' "${_dpop_hdr_file}" | awk '{print $2}' | tr -d '\r\n')
+  rm -f "${_dpop_hdr_file}"
+  if [[ -n "${_dpop_nonce}" ]]; then
+    dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
+    [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
+    curl -s --request POST \
+      -H "${authorization_header}" \
+      -H "${dpop_header}" \
+      --url "${token_endpoint}" \
+      --header "content-type: ${content_type}" \
+      --data "${BODY}" | jq .
+  else
+    echo "${_dpop_body}" | jq .
+  fi
+else
+  curl -s --request POST \
+    -H "${authorization_header}" \
+    -H "${dpop_header}" \
+    --url "${token_endpoint}" \
+    --header "content-type: ${content_type}" \
+    --data "${BODY}" | jq .
+fi
