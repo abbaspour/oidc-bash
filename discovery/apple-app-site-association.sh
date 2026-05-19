@@ -45,4 +45,4 @@ done
 
 [[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
 
-curl -s "https://${AUTH0_DOMAIN}/apple-app-site-association" | jq '.'
+curl -s "https://${AUTH0_DOMAIN}/.well-known/apple-app-site-association" | jq '.'
