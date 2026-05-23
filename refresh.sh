@@ -123,7 +123,7 @@ if [[ -n "${dpop_pem_file}" ]]; then
     --header 'content-type: application/json' \
     --data "${BODY}")
   declare _dpop_nonce
-  _dpop_nonce=$(grep -i '^dpop-nonce:' "${_dpop_hdr_file}" | awk '{print $2}' | tr -d '\r\n')
+  _dpop_nonce=$(grep -i '^dpop-nonce:' "${_dpop_hdr_file}" | awk '{print $2}' | tr -d '\r\n' || true)
   rm -f "${_dpop_hdr_file}"
   if [[ -n "${_dpop_nonce}" ]]; then
     dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
