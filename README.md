@@ -17,7 +17,7 @@ You'll see some code duplicate all authenticating against token endpoint however
 - [OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer (DPoP) - RFC-9449](https://datatracker.ietf.org/doc/html/rfc9449)
 - [OAuth 2.0 Token Exchange - RFC-8693](https://datatracker.ietf.org/doc/html/rfc8693)
 - [OAuth 2.0 JSON Web Token (JWT) Profile for Client Authentication and Authorization Grants - RFC-7523](https://datatracker.ietf.org/doc/html/rfc7523)
-- [Identity Assertion JWT Authorization Grant](https://datatracker.ietf.org/doc/draft-ietf-oauth-identity-assertion-authz-grant/)
+- [Identity Assertion JWT Authorization Grant (ID-JAG)](https://datatracker.ietf.org/doc/draft-ietf-oauth-identity-assertion-authz-grant/)
 
 ## OIDC Family
 - [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
