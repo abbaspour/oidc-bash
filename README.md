@@ -25,14 +25,15 @@ You'll see some code duplicate all authenticating against token endpoint however
 
 # Scripts
 
-| Script                                                  | Description |
-|---------------------------------------------------------|---|
-| [`authorize.sh`](./authorize.sh)                        | Initiates the Authorization Code flow by building an `/authorize` URL (supports PKCE, PAR, JAR) and opening it in the browser. |
-| [`code.sh`](./code.sh) / [`exchange.sh`](./exchange/sh) | Exchanges an authorization code for tokens at the `/token` endpoint (supports PKCE, DPoP, private key JWT, Device Code, CIBA). |
-| [`client-credentials.sh`](./client-credentials.sh)      | Performs the Client Credentials grant for machine-to-machine access tokens (supports client secret, private key JWT, mTLS). |
-| [`device-flow.sh`](./device-flow.sh)                    | Initiates the OAuth 2.0 Device Authorization Grant (RFC 8628) and returns a user code and verification URI. |
-| [`refresh.sh`](./refresh.sh)                            | Uses a refresh token to obtain a new access token (supports DPoP and scope/audience downscoping). |
-| [`resource-owner.sh`](./resource-owner.sh)              | Performs the Resource Owner Password Credentials grant (legacy ROPG flow). |
-| [`token-exchange.sh`](./token-exchange.sh)              | Performs OAuth 2.0 Token Exchange (RFC 8693) to swap one token for another. |
-| [`revoke-refresh-token.sh`](./revoke-refresh-token.sh)  | Revokes a refresh token via the `/oauth/revoke` endpoint. |
-| [`logout.sh`](./logout.sh)                              | Performs RP-Initiated Logout via `/oidc/logout` (or federated/SAML logout variants). |
+| Script                                                 | Description                                                                                                                     |
+|--------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| [`authorize.sh`](./authorize.sh)                       | Initiates the Authorization Code flow by building an `/authorize` URL (supports PKCE, PAR, JAR) and opening it in the browser.  |
+| [`code-exchange.sh`](./code-exchange.sh)               | Exchanges an authorization code for tokens at the `/token` endpoint (supports PKCE, DPoP, private key JWT, Device Code, CIBA).  |
+| [`client-credentials.sh`](./client-credentials.sh)     | Performs the Client Credentials grant for machine-to-machine access tokens (supports client secret, private key JWT, mTLS).     |
+| [`device-flow.sh`](./device-flow.sh)                   | Initiates the OAuth 2.0 Device Authorization Grant (RFC 8628) and returns a user code and verification URI.                     |
+| [`refresh.sh`](./refresh.sh)                           | Uses a refresh token to obtain a new access token (supports DPoP and scope/audience downscoping).                               |
+| [`resource-owner.sh`](./resource-owner.sh)             | Performs the Resource Owner Password Credentials grant (legacy ROPG flow).                                                      |
+| [`token-exchange.sh`](./token-exchange.sh)             | Performs OAuth 2.0 Token Exchange (RFC 8693) to swap one token for another.                                                     |
+| [`revoke-refresh-token.sh`](./revoke-refresh-token.sh) | Revokes a refresh token via the `/oauth/revoke` endpoint.                                                                       |
+| [`logout.sh`](./logout.sh)                             | Performs RP-Initiated Logout via `/oidc/logout` (or federated/SAML logout variants).                                            |
+| [`callback.sh`](./callback.sh)                         | Minimal `redirect_uri` listener (netcat-based) that renders incoming query parameters as an HTML key-value table and to stdout. |
