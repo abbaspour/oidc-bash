@@ -8,6 +8,8 @@
 
 set -eo pipefail
 
+readonly DIR=$(dirname "${BASH_SOURCE[0]}")
+
 command -v openssl >/dev/null || { echo >&2 "error: openssl not found"; exit 3; }
 command -v sed >/dev/null || { echo >&2 "error: sed not found"; exit 3; }
 
@@ -76,9 +78,9 @@ readonly json=$(mktemp --suffix=.json)
 echo "${body}" > "${json}"
 
 case "${ALG}" in
-  RS256|PS256) ./jwt/sign-rs256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}" -A "${ALG}";;
-  HS256) ./jwt/sign-hs256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}";;
-  ES256) ./jwt/sign-es256-jose.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}";;
+  RS256|PS256) "${DIR}"/sign-rs256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}" -A "${ALG}";;
+  HS256) "${DIR}"/sign-hs256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}";;
+  ES256) "${DIR}"/sign-es256-jose.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}";;
   *)  echo >&2 "ERROR: unsupported algorithm: ${ALG}"; usage 1;;
 esac
 

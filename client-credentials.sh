@@ -91,7 +91,7 @@ done
 [[ -n "${opt_myorg}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}my-org/"
 
 if [[ -n "${private_pem}" ]]; then
-  readonly assertion=$("${DIR}"/client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   client_assertion=$(
     cat <<EOL
   , "client_assertion" : "${assertion}",

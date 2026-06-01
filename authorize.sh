@@ -307,7 +307,7 @@ fi
 if [[ -n "${AUTH0_CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
   authorize_params+="&client_secret=${AUTH0_CLIENT_SECRET}"
 elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
-  declare -r signed_client_assertion=$("${DIR}"/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
+  declare -r signed_client_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
   authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 fi
 
