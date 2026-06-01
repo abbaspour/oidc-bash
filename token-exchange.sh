@@ -86,7 +86,7 @@ while getopts "e:t:d:c:x:a:i:I:u:U:s:f:r:ARJpDhv?" opt; do
        realm=${OPTARG} ;;
     p) form_post=1; content_type='application/x-www-form-urlencoded' ;;
     D) opt_disable_discovery=1 ;;
-    v) set -x;;
+    v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
     esac

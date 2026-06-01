@@ -37,7 +37,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p pass
         -O             # MyOrg API audience
         -S             # mark request as CA signed
         -k kid         # client public key jwt id
-        -f private.pem # client private key pem file
+        -K private.pem # client private key pem file
         -C cert.pem    # client certificate for mTLS
         -D             # disable OIDC discovery; use default endpoints
         -h|?           # usage
@@ -70,10 +70,11 @@ declare client_certificate=''
 
 declare token_endpoint_path='oauth/token'
 declare opt_disable_discovery=0
+declare opt_verbose=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:DSAmMOhv?" opt; do
+while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:K:C:DSAmMOhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
@@ -88,7 +89,7 @@ while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:DSAmMOhv?" opt; do
   i) origin_ip=${OPTARG} ;;
   n) cname_api_key=${OPTARG} ;;
   k) kid=${OPTARG} ;;
-  f) private_pem=${OPTARG} ;;
+  K) private_pem=${OPTARG} ;;
   A) ff_prefix='auth0' ;;
   C) client_certificate=$(jq -sRr @uri "${OPTARG}") ;;
   S) ca_signed='SUCCESS' ;;
@@ -96,7 +97,7 @@ while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:f:C:DSAmMOhv?" opt; do
   m) opt_myaccount_api=1 ;;
   O) opt_myorg_api=1 ;;
   D) opt_disable_discovery=1 ;;
-  v) set -x ;;
+  v) opt_verbose=1 ;; #set -x;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
   esac

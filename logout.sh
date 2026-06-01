@@ -18,6 +18,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-i id_token] [-b brow
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain
         -c client_id   # Auth0 client ID
+        -u callback    # callback URL (returnTo)
         -f             # federated logout
         -i id_token    # id_token_hint (for RP initiated logout)
         -s hint        # sid or user_id logout hint (for RP initiated logout)
@@ -37,6 +38,7 @@ declare opt_federated=0
 declare opt_rp_initiated=0
 declare id_token_hint=''
 declare logout_hint=''
+declare opt_verbose=''
 
 while getopts "e:t:d:c:u:b:i:s:fCohv?" opt; do
     case ${opt} in
@@ -51,7 +53,7 @@ while getopts "e:t:d:c:u:b:i:s:fCohv?" opt; do
     o) opt_open=1 ;;
     f) opt_federated=1 ;;
     b) opt_browser="-a ${OPTARG} " ;;
-    v) set -x;;
+    v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
     esac

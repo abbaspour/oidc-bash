@@ -12,14 +12,14 @@ readonly DIR=$(dirname "${BASH_SOURCE[0]}")
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-s scopes] [-a audience] [-m|-v|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-s scopes] [-a audience] [-M|-v|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain
         -c client_id   # Auth0 client ID
         -s scopes      # scope1,scope2,etc
         -a audience    # API audience
-        -m             # Management API audience
+        -M             # Management API audience
         -h|?           # usage
         -v             # verbose
 
@@ -40,7 +40,7 @@ declare opt_mgmnt=''
 declare audience_field=''
 declare scopes_field=''
 
-while getopts "e:t:d:c:a:s:mhv?" opt; do
+while getopts "e:t:d:c:a:s:Mhv?" opt; do
     case ${opt} in
     e) source ${OPTARG} ;;
     t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
@@ -51,7 +51,7 @@ while getopts "e:t:d:c:a:s:mhv?" opt; do
         scopes_field=",\"scope\":\"${scopes}\""
         ;;
     a) audience_field=",\"audience\":\"${OPTARG}\"" ;;
-    m) opt_mgmnt=1 ;;
+    M) opt_mgmnt=1 ;;
     v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;

@@ -18,7 +18,7 @@ declare TTL=300
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-t tenant] [-d domain] [-i client_id] [-f file] [-k kid] [-v|-h]
+USAGE: $0 [-e env] [-a audience] [-i client_id] [-f file] [-k kid] [-A alg] [-t ttl] [-v|-h]
         -e file         # .env file location (default cwd)
         -a audience     # audience
         -i client_id    # client_id
@@ -39,6 +39,7 @@ declare AUDIENCE=''
 declare client_id=''
 declare pem_file=''
 declare kid=''
+declare opt_verbose=''
 
 while getopts "e:t:a:i:f:k:A:hv?" opt
 do
@@ -50,7 +51,7 @@ do
         k) kid=${OPTARG};;
         A) alg=${OPTARG} ;;
         t) TTL=${OPTARG} ;;
-        v) set -x;;
+        v) opt_verbose=1 ;; #set -x;;
         h|?) usage 0;;
         *) usage 1;;
     esac
