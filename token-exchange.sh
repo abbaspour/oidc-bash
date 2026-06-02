@@ -16,7 +16,7 @@ declare AUTH0_SCOPE='openid profile email'
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-i subject_token] [-I type] [-u name] [-U name] [-a audience] [-r resource] [-s scope] [-A|-R|-J|-f realm|-p|-D|-h|-v]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-i subject_token] [-I type] [-u name] [-U name] [-g grant_type] [-G name] [-A assertion] [-a audience] [-r resource] [-s scope] [-R|-J|-f realm|-p|-D|-h|-v]
         -e file               # .env file location (default cwd)
         -t tenant             # Auth0 tenant@region
         -d domain             # Auth0 domain
@@ -26,7 +26,9 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-i
         -I type               # full subject_token_type (URN or custom URI, e.g. http://acme.com/legacy-token)
         -u name               # shortcut: subject_token_type   = urn:ietf:params:oauth:token-type:\$name
         -U name               # shortcut: requested_token_type = urn:ietf:params:oauth:token-type:\$name
-        -A                    # shortcut: subject is access_token  (= -u access_token)
+        -g grant_type         # full grant_type (URN or custom URI)
+        -G name               # shortcut: grant_type = urn:ietf:params:oauth:grant-type:\$name
+        -A assertion          # assertion value (added as "assertion" in request body)
         -R                    # shortcut: subject is refresh_token (= -u refresh_token)
         -J                    # ID-JAG mode: subject=id_token, requested=id-jag
         -f realm              # FCAT (Token Vault) mode + connection name
@@ -54,16 +56,17 @@ declare subject_token_type=''
 declare requested_token_type=''
 declare realm=''
 declare resource=''
+declare assertion=''
 
 declare grant_type='urn:ietf:params:oauth:grant-type:token-exchange'
-declare opt_verbose=0
+declare opt_verbose=''
 declare form_post=0
 declare content_type='application/json'
 declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:i:I:u:U:s:f:r:ARJpDhv?" opt; do
+while getopts "e:t:d:c:x:a:i:I:u:U:g:G:A:s:f:r:RJpDhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -76,7 +79,9 @@ while getopts "e:t:d:c:x:a:i:I:u:U:s:f:r:ARJpDhv?" opt; do
     I) subject_token_type=${OPTARG} ;;
     u) subject_token_type="urn:ietf:params:oauth:token-type:${OPTARG}" ;;
     U) requested_token_type="urn:ietf:params:oauth:token-type:${OPTARG}" ;;
-    A) subject_token_type='urn:ietf:params:oauth:token-type:access_token' ;;
+    g) grant_type=${OPTARG} ;;
+    G) grant_type="urn:ietf:params:oauth:grant-type:${OPTARG}" ;;
+    A) assertion=${OPTARG} ;;
     R) subject_token_type='urn:ietf:params:oauth:token-type:refresh_token' ;;
     J) subject_token_type='urn:ietf:params:oauth:token-type:id_token';
        requested_token_type='urn:ietf:params:oauth:token-type:id-jag' ;;
@@ -95,24 +100,6 @@ done
 [[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
 [[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
 
-[[ -z "${subject_token_type}" ]] && { echo >&2 "ERROR: subject_token_type undefined";  usage 1; }
-[[ -z "${subject_token}" ]] && { echo >&2 "ERROR: subject_token undefined";  usage 1; }
-
-declare secret_field=''
-[[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret_field="\"client_secret\": \"${AUTH0_CLIENT_SECRET}\", "
-
-declare audience_field=''
-[[ -n "${AUTH0_AUDIENCE}" ]] && audience_field="\"audience\": \"${AUTH0_AUDIENCE}\", "
-
-declare requested_token_type_field=''
-[[ -n "${requested_token_type}" ]] && requested_token_type_field="\"requested_token_type\": \"${requested_token_type}\", "
-
-declare realm_field=''
-[[ -n "${realm}" ]] && realm_field="\"connection\": \"${realm}\", "
-
-declare resource_field=''
-[[ -n "${resource}" ]] && resource_field="\"resource\": \"${resource}\", "
-
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
 declare token_endpoint="${AUTH0_DOMAIN}/oauth/token"
@@ -124,31 +111,39 @@ if [[ ${opt_disable_discovery} -eq 0 ]]; then
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
 fi
 
-#            "scope": "${AUTH0_SCOPE}",
+declare BODY
+BODY=$(jq -n \
+  --arg grant_type "${grant_type}" \
+  --arg client_id "${AUTH0_CLIENT_ID}" \
+  --arg client_secret "${AUTH0_CLIENT_SECRET}" \
+  --arg subject_token "${subject_token}" \
+  --arg subject_token_type "${subject_token_type}" \
+  --arg requested_token_type "${requested_token_type}" \
+  --arg audience "${AUTH0_AUDIENCE}" \
+  --arg resource "${resource}" \
+  --arg connection "${realm}" \
+  --arg assertion "${assertion}" \
+  '{
+     grant_type: $grant_type,
+     client_id: $client_id,
+     client_secret: $client_secret,
+     subject_token: $subject_token,
+     subject_token_type: $subject_token_type,
+     requested_token_type: $requested_token_type,
+     audience: $audience,
+     resource: $resource,
+     connection: $connection,
+     assertion: $assertion
+   } | with_entries(select(.value != ""))')
 
-declare BODY=$(cat <<EOL
-{
-            "grant_type": "${grant_type}",
-            "subject_token" : "${subject_token}",
-            "subject_token_type" : "${subject_token_type}",
-            ${audience_field}
-            ${resource_field}
-            ${requested_token_type_field}
-            ${secret_field}
-            ${realm_field}
-            "client_id": "${AUTH0_CLIENT_ID}"
-}
-EOL
-)
-
-echo $BODY | jq .
+[[ -n "${opt_verbose}" ]] && echo "$BODY" | jq .
 
 if [[ ${form_post} -eq 1 ]]; then
   BODY=$(echo "${BODY}" | jq -r 'to_entries | map("\(.key)=\(.value|tostring|@uri)") | join("&")')
 fi
 
-curl -k -H "content-type: ${content_type}" \
+curl -s -k -H "content-type: ${content_type}" \
     -d "${BODY}" \
-    --url "${token_endpoint}"
+    --url "${token_endpoint}" | jq .
 
 echo

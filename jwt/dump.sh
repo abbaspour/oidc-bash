@@ -8,5 +8,12 @@
 
 command -v jq >/dev/null || { echo >&2 "error: jq not found"; exit 3; }
 
-[[ $# -lt 1 ]] && jwt=$access_token || jwt=$1
+if [[ $# -ge 1 ]]; then
+    jwt=$1
+elif [[ ! -t 0 ]]; then
+    read -r jwt
+else
+    jwt=$access_token
+fi
+
 jq -Rr 'split(".")[1] | gsub("-";"+") | gsub("_";"/") | gsub("%3D";"=") | @base64d | fromjson' <<<"${jwt}"

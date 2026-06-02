@@ -75,6 +75,11 @@ handle_request() {
     path=${request_line#* }
     path=${path%% *}
 
+    case "$method" in
+        GET|POST|HEAD|OPTIONS) ;;
+        *) echo >&2 "  ignoring non-HTTP request"; return ;;
+    esac
+
     query=''
     [[ "$path" == *\?* ]] && query="${path#*\?}"
 
@@ -100,6 +105,9 @@ handle_request() {
         html_rows='<tr><td colspan="2"><i>(no query parameters)</i></td></tr>'
     fi
 
+    local script_content=''
+    [[ -f "${DIR}/callback.js" ]] && script_content=$(<"${DIR}/callback.js")
+
     local body
     body="<!doctype html>
 <html><head><meta charset=\"utf-8\"><title>OIDC Callback</title>
@@ -109,6 +117,7 @@ td{border:1px solid #ccc;padding:6px 10px;vertical-align:top}
 code{word-break:break-all}</style></head>
 <body><h1>OIDC Callback</h1>
 <table>${html_rows}</table>
+<script>${script_content}</script>
 </body></html>"
 
     printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s' "${#body}" "$body"
@@ -118,11 +127,12 @@ declare RESPONSE_FIFO
 RESPONSE_FIFO=$(mktemp -u)
 mkfifo "$RESPONSE_FIFO"
 trap 'rm -f "$RESPONSE_FIFO"' EXIT INT TERM
+trap '' PIPE
 
 echo >&2 "Listening on http://localhost:${port}/  (Ctrl-C to stop)"
 
 # nc reads response bytes from FIFO and forwards to client; bytes received from
 # client flow into handle_request, whose stdout writes back into the FIFO.
 while true; do
-    nc -l "$port" < "$RESPONSE_FIFO" | handle_request > "$RESPONSE_FIFO"
+    nc -l "$port" < "$RESPONSE_FIFO" | handle_request > "$RESPONSE_FIFO" || true
 done

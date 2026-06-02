@@ -40,7 +40,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -u callback    # callback URL (default ${AUTH0_REDIRECT_URI})
         -s scopes      # comma separated list of scopes (default is "${AUTH0_SCOPE}")
         -p prompt      # prompt type: none, silent, login, consent
-        -R mode        # response_mode of: web_message, form_post, fragment
+        -R mode        # response_mode of: query, web_message, form_post, fragment
         -S state       # state
         -n nonce       # nonce
         -H hint        # login hint (for CIBA should be JSON with sub and aud)

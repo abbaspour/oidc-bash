@@ -37,3 +37,9 @@ You'll see some code duplicate all authenticating against token endpoint however
 | [`revoke-refresh-token.sh`](./revoke-refresh-token.sh) | Revokes a refresh token via the `/oauth/revoke` endpoint.                                                                       |
 | [`logout.sh`](./logout.sh)                             | Performs RP-Initiated Logout via `/oidc/logout` (or federated/SAML logout variants).                                            |
 | [`callback.sh`](./callback.sh)                         | Minimal `redirect_uri` listener (netcat-based) that renders incoming query parameters as an HTML key-value table and to stdout. |
+
+
+# Check
+```bash
+shellcheck --shell bash --exclude=SC2155 --severity=warning *.sh
+```
