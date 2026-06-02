@@ -8,7 +8,7 @@
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-a access_token] [-o|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-a access_token] [-v|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region (for opaque tokens)
         -d domain      # Auth0 domain (for opaque tokens)
@@ -26,7 +26,7 @@ declare AUTH0_DOMAIN=''
 
 declare opt_verbose=0
 
-while getopts "e:t:d:a::hv?" opt; do
+while getopts "e:t:d:a:hv?" opt; do
     case ${opt} in
     e) source ${OPTARG} ;;
     t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;

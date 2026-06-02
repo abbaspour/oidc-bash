@@ -14,7 +14,7 @@ command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
 
 function usage() {
   cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a audience] [-m|-O|-v|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a audience] [-M|-O|-v|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # Auth0 tenant@region
         -d domain      # Auth0 domain or edge location
@@ -23,8 +23,8 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a
         -a audience    # API audience
         -o org_id      # Organization ID
         -k kid         # client public key jwt id
-        -f private.pem # client private key pem file
-        -m             # Management API audience
+        -K private.pem # client private key pem file
+        -M             # Management API audience
         -O             # MyOrg API audience
         -n api_key     # cname_api_key
         -C cert.pem    # client certificate for mTLS
@@ -33,7 +33,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a
         -v             # verbose
 
 eg,
-     $0 -t amin01@au -i aIioQEeY7nJdX78vcQWDBcAqTABgKnZl -x XXXXXX -m
+     $0 -t amin01@au -c aIioQEeY7nJdX78vcQWDBcAqTABgKnZl -x XXXXXX -M
 END
   exit $1
 }
@@ -53,10 +53,11 @@ declare client_certificate=''
 declare ca_signed='FAILED: self signed certificate'
 declare opt_mgmnt=''
 declare opt_myorg=''
+declare opt_verbose=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:a:o:x:k:f:n:C:OSmhv?" opt; do
+while getopts "e:t:d:c:a:o:x:k:K:n:C:OSMhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -66,13 +67,13 @@ while getopts "e:t:d:c:a:o:x:k:f:n:C:OSmhv?" opt; do
   a) AUTH0_AUDIENCE=${OPTARG} ;;
   o) AUTH0_ORGANIZATION=${OPTARG} ;;
   k) kid=${OPTARG} ;;
-  f) private_pem=${OPTARG} ;;
+  K) private_pem=${OPTARG} ;;
   n) cname_api_key=${OPTARG} ;;
   C) client_certificate=$(jq -sRr @uri "${OPTARG}") ;;
   S) ca_signed='SUCCESS' ;;
-  m) opt_mgmnt=1 ;;
+  M) opt_mgmnt=1 ;;
   O) opt_myorg=1 ;;
-  v) set -x ;;
+  v) opt_verbose=1 ;; #set -x;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
   esac
@@ -91,7 +92,7 @@ done
 [[ -n "${opt_myorg}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}my-org/"
 
 if [[ -n "${private_pem}" ]]; then
-  readonly assertion=$("${DIR}"/client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   client_assertion=$(
     cat <<EOL
   , "client_assertion" : "${assertion}",

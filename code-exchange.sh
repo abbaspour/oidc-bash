@@ -128,7 +128,7 @@ else
 fi
 
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$(./client-assertion.sh -a "${issuer}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
+  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
   readonly client_assertion=$(cat <<EOL
     , "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
     "client_assertion" : "${assertion}"
@@ -152,7 +152,7 @@ EOL
 )
 
 if [[ -n "${dpop_pem_file}" ]]; then
-    dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}")"
+    dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}")"
     [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
 fi
 
@@ -179,7 +179,7 @@ if [[ -n "${dpop_pem_file}" ]]; then
   _dpop_nonce=$(grep -i '^dpop-nonce:' "${_dpop_hdr_file}" | awk '{print $2}' | tr -d '\r\n' || true)
   rm -f "${_dpop_hdr_file}"
   if [[ -n "${_dpop_nonce}" ]]; then
-    dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
+    dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
     [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
     curl -s --request POST \
       -H "${authorization_header}" \

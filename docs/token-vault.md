@@ -4,7 +4,7 @@
 
 export refresh_token='$refresh_token'
 
-./token-exchange.sh -d domain -c clientId -x clientSecret -r ConnectionName -f -R "${refresh_token}"
+./token-exchange.sh -d domain -c clientId -x clientSecret -f ConnectionName -R -i "${refresh_token}"
 ```
 
 
@@ -14,5 +14,5 @@ export refresh_token='$refresh_token'
 
 export access_token='$access_token'
 
-./token-exchange.sh -d domain -c apiClientId -x apiClientSecret -r ConnectionName -f -A "${access_token}" -A some.api
+./token-exchange.sh -d domain -c apiClientId -x apiClientSecret -f ConnectionName -A -i "${access_token}" -a some.api
 ```

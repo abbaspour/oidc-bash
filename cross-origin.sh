@@ -46,11 +46,12 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p pass
         -S state       # state
         -n nonce       # nonce
         -s scopes      # scopes (comma-separated, default "${AUTH0_SCOPE}")
+        -M             # Management API audience
         -h|?           # usage
         -v             # verbose
 
 eg,
-     $0 -t amin01@au -u somebody@gmail.com  -p XXXXX -c 1iSgx01LN27oEgpFfGvG2UASbpSndtXg -m
+     $0 -t amin01@au -u somebody@gmail.com  -p XXXXX -c 1iSgx01LN27oEgpFfGvG2UASbpSndtXg -M
 END
     exit $1
 }
@@ -67,7 +68,7 @@ declare opt_nonce=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:a:u:p:r:o:U:s:S:n:mhv?" opt; do
+while getopts "e:t:d:c:a:u:p:r:o:U:s:S:n:Mhv?" opt; do
     case ${opt} in
     e) source ${OPTARG} ;;
     t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
@@ -82,7 +83,7 @@ while getopts "e:t:d:c:a:u:p:r:o:U:s:S:n:mhv?" opt; do
     s) AUTH0_SCOPE=$(echo ${OPTARG} | tr ',' ' ') ;;
     S) opt_state=${OPTARG} ;;
     n) opt_nonce=${OPTARG} ;;
-    m) opt_mgmnt=1 ;;
+    M) opt_mgmnt=1 ;;
     v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;

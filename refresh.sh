@@ -109,7 +109,7 @@ EOL
 
 declare dpop_header=''
 if [[ -n "${dpop_pem_file}" ]]; then
-    dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}")"
+    dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}")"
     [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
 fi
 
@@ -126,7 +126,7 @@ if [[ -n "${dpop_pem_file}" ]]; then
   _dpop_nonce=$(grep -i '^dpop-nonce:' "${_dpop_hdr_file}" | awk '{print $2}' | tr -d '\r\n' || true)
   rm -f "${_dpop_hdr_file}"
   if [[ -n "${_dpop_nonce}" ]]; then
-    dpop_header="DPoP: $(./dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
+    dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
     [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
     curl -s --request POST \
       -H "${dpop_header}" \

@@ -40,7 +40,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -u callback    # callback URL (default ${AUTH0_REDIRECT_URI})
         -s scopes      # comma separated list of scopes (default is "${AUTH0_SCOPE}")
         -p prompt      # prompt type: none, silent, login, consent
-        -R mode        # response_mode of: web_message, form_post, fragment
+        -R mode        # response_mode of: query, web_message, form_post, fragment
         -S state       # state
         -n nonce       # nonce
         -H hint        # login hint (for CIBA should be JSON with sub and aud)
@@ -111,7 +111,7 @@ declare opt_mgmnt=''
 declare opt_mfa_api=''
 declare opt_myaccount_api=''
 declare opt_myorg_api=''
-declare opt_state=''
+declare opt_state='mystate'
 declare opt_nonce='mynonce'
 declare opt_login_hint=''
 declare opt_id_token_hint=''
@@ -307,7 +307,7 @@ fi
 if [[ -n "${AUTH0_CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
   authorize_params+="&client_secret=${AUTH0_CLIENT_SECRET}"
 elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
-  declare -r signed_client_assertion=$("${DIR}"/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
+  declare -r signed_client_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
   authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 fi
 
