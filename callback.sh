@@ -106,7 +106,7 @@ handle_request() {
     fi
 
     local script_content=''
-    [[ -f "${DIR}/callback.js" ]] && script_content=$(<"${DIR}/callback.js")
+    [[ -f "${DIR}/js/hash.js" ]] && script_content=$(<"${DIR}/js/hash.js")
 
     local body
     body="<!doctype html>
