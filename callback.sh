@@ -7,8 +7,9 @@
 #
 # callback.sh: A minimal OAuth2/OIDC redirect_uri server.
 # Listens on a TCP port using netcat, parses the query string from the incoming
-# GET request, and (1) renders an HTML key-value table to the browser and
+# GET/POST request, and (1) renders an HTML key-value table to the browser and
 # (2) prints the same key-value pairs to the console.
+# Supports printing to browser for implicit hashtag params.
 ##########################################################################################
 
 set -ueo pipefail
@@ -62,13 +63,18 @@ html_escape() {
 }
 
 handle_request() {
-    local request_line line method path query
+    local request_line line method path query content_length=0 content_type=''
     if ! IFS= read -r request_line; then return; fi
     request_line=${request_line%$'\r'}
 
     while IFS= read -r line; do
         line=${line%$'\r'}
         [[ -z "$line" ]] && break
+        local lower="${line,,}"
+        case "$lower" in
+            content-length:*) content_length="${line#*:}"; content_length="${content_length// /}" ;;
+            content-type:*) content_type="${line#*:}"; content_type="${content_type# }" ;;
+        esac
     done
 
     method=${request_line%% *}
@@ -83,14 +89,26 @@ handle_request() {
     query=''
     [[ "$path" == *\?* ]] && query="${path#*\?}"
 
+    local req_body=''
+    if [[ "$method" == "POST" && "$content_length" =~ ^[0-9]+$ && "$content_length" -gt 0 ]]; then
+        IFS= read -r -N "$content_length" req_body || true
+    fi
+
+    local source_label='query' params="$query"
+    if [[ "$method" == "POST" && "$content_type" == application/x-www-form-urlencoded* && -n "$req_body" ]]; then
+        source_label='form'
+        params="$req_body"
+    fi
+
     echo >&2 ''
     echo >&2 "[$(date '+%Y-%m-%d %H:%M:%S')] ${method} ${path}"
     [[ -n "${opt_verbose}" ]] && echo >&2 "  raw: ${request_line}"
+    [[ -n "${opt_verbose}" && -n "$req_body" ]] && echo >&2 "  body: ${req_body}"
 
     local html_rows=''
-    if [[ -n "$query" ]]; then
+    if [[ -n "$params" ]]; then
         local -a pairs
-        IFS='&' read -ra pairs <<< "$query"
+        IFS='&' read -ra pairs <<< "$params"
         for pair in "${pairs[@]}"; do
             local key="${pair%%=*}"
             local value=''
@@ -101,8 +119,8 @@ handle_request() {
             html_rows+="<tr><td><b>$(html_escape "$key")</b></td><td><code>$(html_escape "$value")</code></td></tr>"
         done
     else
-        echo >&2 '  (no query parameters)'
-        html_rows='<tr><td colspan="2"><i>(no query parameters)</i></td></tr>'
+        echo >&2 "  (no ${source_label} parameters)"
+        html_rows="<tr><td colspan=\"2\"><i>(no ${source_label} parameters)</i></td></tr>"
     fi
 
     local script_content=''
