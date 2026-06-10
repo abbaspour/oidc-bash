@@ -144,7 +144,21 @@ code{word-break:break-all}</style></head>
 declare RESPONSE_FIFO
 RESPONSE_FIFO=$(mktemp -u)
 mkfifo "$RESPONSE_FIFO"
-trap 'rm -f "$RESPONSE_FIFO"' EXIT INT TERM
+
+cleanup() {
+    rm -f "$RESPONSE_FIFO"
+}
+
+on_signal() {
+    trap - INT TERM
+    echo >&2 ''
+    echo >&2 'Shutting down.'
+    cleanup
+    exit 130
+}
+
+trap cleanup EXIT
+trap on_signal INT TERM
 trap '' PIPE
 
 echo >&2 "Listening on http://localhost:${port}/  (Ctrl-C to stop)"
