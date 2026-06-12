@@ -166,5 +166,14 @@ echo >&2 "Listening on http://localhost:${port}/  (Ctrl-C to stop)"
 # nc reads response bytes from FIFO and forwards to client; bytes received from
 # client flow into handle_request, whose stdout writes back into the FIFO.
 while true; do
-    nc -l "$port" < "$RESPONSE_FIFO" | handle_request > "$RESPONSE_FIFO" || true
+    nc_err=$(mktemp)
+    if ! nc -l "$port" < "$RESPONSE_FIFO" 2>"$nc_err" | handle_request > "$RESPONSE_FIFO"; then
+        nc_status=${PIPESTATUS[0]}
+        if [[ $nc_status -ne 0 ]]; then
+            echo >&2 "ERROR: nc failed (exit ${nc_status}): $(cat "$nc_err")"
+            rm -f "$nc_err"
+            exit 1
+        fi
+    fi
+    rm -f "$nc_err"
 done
