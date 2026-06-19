@@ -11,6 +11,7 @@ You'll see some code duplicate all authenticating against token endpoint however
 ## OAuth 2 Family
 - [The OAuth 2.0 Authorization Framework - RFC-6749](https://datatracker.ietf.org/doc/html/rfc6749)
 - [The OAuth 2.1 Authorization Framework](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/)
+- [Proof Key for Code Exchange by OAuth Public Clients - RFC-7636](https://datatracker.ietf.org/doc/html/rfc7636)
 - [OAuth 2.0 Device Authorization Grant - RFC-8628](https://datatracker.ietf.org/doc/html/rfc8628)
 - [OAuth 2.0 Pushed Authorization Requests (PAR) - RFC-9126](https://datatracker.ietf.org/doc/html/rfc9126)
 - [OAuth 2.0 JWT-Secured Authorization Request (JAR) - RFC-9101](https://datatracker.ietf.org/doc/html/rfc9101) 

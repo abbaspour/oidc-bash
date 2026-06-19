@@ -87,11 +87,11 @@ Once login is successful, user is provisioned in Auth0.
 ![callback](./images/xaa-demo-02.png)
 ![profile](./images/xaa-demo-03.png)
 
-## Step 1 - Get id_token from Okta with Requesting App (agent0)
+## Step 2 - Get id_token from Okta with Requesting App (agent0)
 
 ```bash
 
-./authorize.sh -d $okta_domain -c $req_app_id -u http://localhost:3000/login/callback -C
+./authorize.sh -d $okta_domain -c $req_app_id -u http://localhost:3000/cb -C
 
 export id_token='....'
 ```
@@ -125,7 +125,7 @@ Sample id_token from Okta will look like this:
 }
 ```
 
-### Step 2 - Request ID-JAG using id_token
+### Step 3 - Request ID-JAG using id_token
 
 ```bash
 
@@ -159,7 +159,7 @@ And here is a sample decoded ID-JAG JWT
 }
 ```
 
-### Step 3 - Request access_token using ID-JAG
+### Step 4 - Request access_token using ID-JAG
 
 ```bash
 

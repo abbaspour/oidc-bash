@@ -7,7 +7,7 @@ reference: https://docs.google.com/document/d/1E6jj11C72paoilTWWkoemqHsuuyZlhTjc
 ### 1. Get Management Access Token
 ```bash
 eval `./login/export-management-at.sh`
-./jwt/dump.sh
+./jwt/decode.sh
 ```
 
 Required scopes are:
@@ -75,6 +75,6 @@ For ROPG
 ## 8. Check Token Binding (if enabled)
 ```bash
 export JWT='access_token_from_prev_step'
-../jwt/dump.sh ${JWT} | jq -r '.cnf."x5t#S256"' 
+../jwt/decode.sh ${JWT} | jq -r '.cnf."x5t#S256"' 
 ../ca/thumbprint.sh -f ../ca/mtls-m2m-cert.pem # two values should match 
 ``` 
