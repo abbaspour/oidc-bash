@@ -91,7 +91,7 @@ Once login is successful, user is provisioned in Auth0.
 
 ```bash
 
-./authorize.sh -d $okta_domain -c $req_app_id -u http://localhost:3000/login/callback -C
+./authorize.sh -d $okta_domain -c $req_app_id -u http://localhost:3000/cb -C
 
 export id_token='....'
 ```
