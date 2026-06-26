@@ -73,7 +73,7 @@ export req_app_secret='ZFoR7xxxx-IRTc9cD'             # Agent0 in Okta - setup s
 Run callback.sh to start listening.
 
 ```bash
-./callback.sh
+./web/server.sh
 ```
 
 ## Step 1 - Federate from Auth0 to Okta to provision Federated User (one time only)

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>OIDC Bash Toolkit</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 3em auto; padding: 0 1em; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre  { background: #f4f4f4; padding: 1em; border-radius: 4px; overflow-x: auto; }
+    a    { color: #0070c0; }
+  </style>
+</head>
+<body>
+  <h1>OIDC Bash Toolkit</h1>
+  <p>Local OAuth2 / OIDC callback server is running.</p>
+
+  <h2>Callback URL</h2>
+  <p>Use the following as your <code>redirect_uri</code>:</p>
+  <pre><code id="cb-url"></code></pre>
+
+  <script>
+    var cbUrl = window.location.origin + '/cgi-bin/cb.sh';
+    document.getElementById('cb-url').textContent = cbUrl;
+  </script>
+</body>
+</html>
