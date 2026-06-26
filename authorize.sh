@@ -17,7 +17,7 @@ readonly DIR=$(dirname "${BASH_SOURCE[0]}")
 # 3. ./authorize.sh -t tenant -c client_id
 ##
 
-declare AUTH0_REDIRECT_URI='https://jwt.io'
+declare AUTH0_REDIRECT_URI='http://localhost:3000/cgi-bin/cb.sh'
 declare AUTH0_SCOPE='openid profile email'
 declare AUTH0_RESPONSE_TYPE='id_token'
 declare AUTH0_RESPONSE_MODE=''
