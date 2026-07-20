@@ -16,12 +16,14 @@ declare AUTH0_SCOPE='openid profile email'
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-i subject_token] [-I type] [-u name] [-U name] [-g grant_type] [-G name] [-A assertion] [-a audience] [-r resource] [-s scope] [-R|-J|-f realm|-p|-D|-h|-v]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-k kid] [-K private.pem] [-i subject_token] [-I type] [-u name] [-U name] [-g grant_type] [-G name] [-A assertion] [-a audience] [-r resource] [-s scope] [-R|-J|-f realm|-p|-D|-h|-v]
         -e file               # .env file location (default cwd)
         -t tenant             # Auth0 tenant@region
         -d domain             # Auth0 domain
         -c client_id          # Auth0 client ID
         -x secret             # Auth0 client secret
+        -k kid                # client public key JWT-CA key id
+        -K private.pem        # JWT-CA client private key file for client assertion
         -i subject_token      # subject_token value
         -I type               # full subject_token_type (URN or custom URI, e.g. http://acme.com/legacy-token)
         -u name               # shortcut: subject_token_type   = urn:ietf:params:oauth:token-type:\$name
@@ -57,6 +59,8 @@ declare requested_token_type=''
 declare realm=''
 declare resource=''
 declare assertion=''
+declare kid=''
+declare private_pem=''
 
 declare grant_type='urn:ietf:params:oauth:grant-type:token-exchange'
 declare opt_verbose=''
@@ -66,13 +70,15 @@ declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:i:I:u:U:g:G:A:s:f:r:RJpDhv?" opt; do
+while getopts "e:t:d:c:x:k:K:a:i:I:u:U:g:G:A:s:f:r:RJpDhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
     d) AUTH0_DOMAIN=${OPTARG} ;;
     c) AUTH0_CLIENT_ID=${OPTARG} ;;
     x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
+    k) kid=${OPTARG} ;;
+    K) private_pem=${OPTARG} ;;
     a) AUTH0_AUDIENCE=${OPTARG} ;;
     r) resource=${OPTARG} ;;
     i) subject_token=${OPTARG} ;;
@@ -103,12 +109,25 @@ done
 [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
 
 declare token_endpoint="${AUTH0_DOMAIN}/oauth/token"
+declare issuer="${AUTH0_DOMAIN}"
+[[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
   discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
   declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
+  [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
+fi
+
+declare client_assertion=''
+declare client_assertion_type=''
+if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
+  declare jwt_ca_assertion
+  jwt_ca_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}/oauth2/v1/token" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  client_assertion="${jwt_ca_assertion}"
+  client_assertion_type='urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 fi
 
 declare BODY
@@ -122,7 +141,10 @@ BODY=$(jq -n \
   --arg audience "${AUTH0_AUDIENCE}" \
   --arg resource "${resource}" \
   --arg connection "${realm}" \
+  --arg scope "${AUTH0_SCOPE}" \
   --arg assertion "${assertion}" \
+  --arg client_assertion "${client_assertion}" \
+  --arg client_assertion_type "${client_assertion_type}" \
   '{
      grant_type: $grant_type,
      client_id: $client_id,
@@ -133,7 +155,10 @@ BODY=$(jq -n \
      audience: $audience,
      resource: $resource,
      connection: $connection,
-     assertion: $assertion
+     scope: $scope,
+     assertion: $assertion,
+     client_assertion: $client_assertion,
+     client_assertion_type: $client_assertion_type
    } | with_entries(select(.value != ""))')
 
 [[ -n "${opt_verbose}" ]] && echo "$BODY" | jq .

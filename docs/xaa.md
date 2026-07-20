@@ -60,14 +60,16 @@ Under **Manage Connections** connect this app to `Todo0` from Step 1.
 Assign environment variables.
 
 ```bash
-export auth0_domain='abbaspour.auth0.com'
-export connection='xaa-idp'                           # Okta connection in Auth0 - step step 1 
-export client_id='vlbB747IIDdNvkEqiNgUq5JNmIhH8bob'   # Agent0 in Auth0 - step step 3
-export client_secret='PaAvicxxxxxJbxkMj4'             # Agent0 in Auth0 - step step 3
+export connection='okta-integrator'                    # Okta connection in Auth0 - step step 1 
 
-export okta_domain='amin.oktapreview.com'
-export req_app_id='0oazekni6zXya9mh91d7'              # Agent0 in Okta - setup step 4 
-export req_app_secret='ZFoR7xxxx-IRTc9cD'             # Agent0 in Okta - setup step 4
+export auth0_domain='amin.jp.auth0.com'
+export client_id='Josz8cBBCWKA6Q7CkhyhYjbKY4hqjXMG'    # Agent0 Request app in Auth0 - step step 3
+export client_secret="xxx-xxxx"                        # Agent0 in Auth0 - step step 3
+
+export okta_domain='integrator-4598441.okta.com'
+export agent_app_id='wlp159l03ysVKZlzt698'              
+export req_app_id='0oa15duskmnhzdvvJ698'              # Agent0 in Okta - setup step 4 
+export req_app_secret="xV1Lmtvihlv2iG6xJJ-xx"         # Agent0 in Okta - setup step 4
 ```
 
 Run callback.sh to start listening.
@@ -78,7 +80,7 @@ Run callback.sh to start listening.
 
 ## Step 1 - Federate from Auth0 to Okta to provision Federated User (one time only)
 ```bash
-./authorize.sh -d $auth0_domain -c $client_id -r $connection -u http://localhost:3000/cb -C 
+./authorize.sh -d $auth0_domain -c $client_id -r $connection -u http://localhost:3000/cgi-bin/cb.sh -C 
 ```
 Open the browser, paste the URL from clipboard and login with one of the users assigned to the app in setup step 5.
 ![okta login](./images/xaa-demo-01.png)
@@ -91,7 +93,7 @@ Once login is successful, user is provisioned in Auth0.
 
 ```bash
 
-./authorize.sh -d $okta_domain -c $req_app_id -u http://localhost:3000/cb -C
+./authorize.sh -d $okta_domain -c $req_app_id -u http://localhost:3000/cgi-bin/cb.sh -C
 
 export id_token='....'
 ```
@@ -100,46 +102,49 @@ Sample id_token from Okta will look like this:
 
 ```json
 {
-  "sub": "00uzekrk6tGSxXmRh1d7",
-  "locale": "en-US",
-  "email": "bob@tables.fake",
+  "sub": "00u14j584jskYLAVs698",
+  "name": "Test XAA",
+  "locale": "en_US",
+  "email": "test-xaa@example.com",
   "ver": 1,
-  "iss": "https://amin.oktapreview.com",
-  "aud": "0oazekni6zXya9mh91d7",
-  "iat": 1780382948,
-  "exp": 1780386548,
-  "jti": "ID.Gaa4VzNszYAcLiFBVisDelmFvMsjR_UxKOD8nZfyrcQ",
+  "iss": "https://integrator-4598441.okta.com",
+  "aud": "0oa15duskmnhzdvvJ698",
+  "iat": 1784527202,
+  "exp": 1784530802,
+  "jti": "ID.AAleSpOCaxiaNY7u30iwdQ1jHcO6_CM3t4Ww2fXQKGo",
   "amr": [
     "pwd"
   ],
-  "idp": "00ocqzjhistjXcOWE1d7",
+  "idp": "00o14ebpcyuYvL2Yi698",
   "nonce": "mynonce",
-  "sid": "idxKF0VoEs8TcixKJW_RwQLSQ",
-  "preferred_username": "bob@tables.fake",
-  "given_name": "Bob",
-  "family_name": "Tables",
+  "preferred_username": "test-xaa@example.com",
+  "given_name": "Test",
+  "family_name": "XAA",
   "zoneinfo": "America/Los_Angeles",
-  "updated_at": 1780288609,
-  "email_verified": false,
-  "auth_time": 1780382536
+  "updated_at": 1784512921,
+  "email_verified": true,
+  "auth_time": 1784527037
 }
 ```
 
 ### Step 3 - Request ID-JAG using id_token
 
 ```bash
+./token-exchange.sh -d $okta_domain -c $agent_app_id -k 89799ce500e455d5efdb96f24f93c836 -K xaa2/okta-agent-priv.pem \
+  -i $id_token -a https://$auth0_domain/ -s read -p -J
 
-export id_jag=`./token-exchange.sh -d $okta_domain -c $req_app_id -x $req_app_secret \
-  -i $id_token -a https://$auth0_domain/ -r urn:todo0:api -p -J | jq -r .access_token`
+export id_jag=$(./token-exchange.sh -d $okta_domain -c $agent_app_id -k 89799ce500e455d5efdb96f24f93c836 -K xaa2/okta-agent-priv.pem \
+  -i $id_token -a https://$auth0_domain/ -s read -p -J | jq -r .access_token)
+
 ```
 
 Here is a sample full payload of an exchange result 
 ```json  
 {
-  "token_type":"N_A",
-  "expires_in":300,
-  "access_token":"eyJraWQ....10zjUw",
-  "issued_token_type":"urn:ietf:params:oauth:token-type:id-jag"
+  "token_type": "N_A",
+  "expires_in": 300,
+  "access_token": "eyJraWQiOiJFeEwySVlfaFdvdWhVeVNTUHVKZlI0U1hIaWdOdFNWVjB2RzlyN1F1N2ZRIiwidHlwIjoib2F1dGgtaWQtamFnK2p3dCIsImFsZyI6IlJTMjU2In0.eyJqdGkiOiJJREFBRy5ZMGZyd3hpT3k1dW9mbnM3amM5S2VTVG00NmFDTndlUkhLZl84RXd6SjV3IiwiaXNzIjoiaHR0cHM6Ly9pbnRlZ3JhdG9yLTQ1OTg0NDEub2t0YS5jb20iLCJhdWQiOiJodHRwczovL2FtaW4uanAuYXV0aDAuY29tLyIsImlhdCI6MTc4NDUyNzI3NiwiZXhwIjoxNzg0NTI3NTc2LCJzdWIiOiIwMHUxNGo1ODRqc2tZTEFWczY5OCIsImVtYWlsIjoidGVzdC14YWFAZXhhbXBsZS5jb20iLCJjbGllbnRfaWQiOiJKb3N6OGNCQkNXS0E2UTdDa2h5aFlqYktZNGhxalhNRyIsInN1Yl9wcm9maWxlIjoidXNlciIsInNjb3BlIjoicmVhZCIsImFjdCI6eyJzdWIiOiJ3bHAxNWR2N2M5OFhWUVlkMjY5OCIsInN1Yl9wcm9maWxlIjoiYWlfYWdlbnQiLCJhY3QiOnsic3ViIjoiMG9hMTVkdXNrbW5oemR2dko2OTgiLCJzdWJfcHJvZmlsZSI6IndlYl9hcHAifX19.ApZvVMAsZHAVrjllHga3qM1jLcGlQRu1QUkc0dZR3pMChr9pc1B5azW-DumswaJyZvogW5K5a-vZzZF21Br6AE2GOuSHd6GQ2SGB4Yjc4tajSf1gfnvX_4Y4upkw0yHKcxwC1EYx9ujFl8sLWxWVC4uU8SvzHuSCXMQqNGIMMxlrfXcgbCOYeIHhoAFu1jA2mSPU-haf7LH2oDN7YtnM8ouV8-4BBKAp0SHWjEg3ig5GHecomiwoWYTWJWVRYZhuFrt6c_PpgMmoQU5xnD6WcYeobkcacfpUeN433n4Tlh5onM8Hly1GzQ_rP6gpSsHc_geMmrVmv1F__IBNatCOJA",
+  "issued_token_type": "urn:ietf:params:oauth:token-type:id-jag"
 }
 ```  
 
@@ -147,36 +152,45 @@ And here is a sample decoded ID-JAG JWT
 
 ```json
 {
-  "jti": "IDAAG.agk1Ey5Rx64q18AF4uL0z5b-7ij-eV6JLlVYMSpf-yo",
-  "iss": "https://amin.oktapreview.com",
-  "aud": "https://abbaspour.auth0.com/",
-  "iat": 1780371959,
-  "exp": 1780372259,
-  "sub": "00uzekrk6tGSxXmRh1d7",
-  "resource": "urn:todo0:api",
-  "email": "bob@tables.fake",
-  "client_id": "vlbB747IIDdNvkEqiNgUq5JNmIhH8bob"
+  "jti": "IDAAG.kufb35qQKxg8YkOGZKR0lvkr4Y9ygQ_hH6tD1iagmLY",
+  "iss": "https://integrator-4598441.okta.com",
+  "aud": "https://amin.jp.auth0.com/",
+  "iat": 1784527782,
+  "exp": 1784528082,
+  "sub": "00u14j584jskYLAVs698",
+  "email": "test-xaa@example.com",
+  "client_id": "Josz8cBBCWKA6Q7CkhyhYjbKY4hqjXMG",
+  "sub_profile": "user",
+  "scope": "read",
+  "act": {
+    "sub": "wlp15dv7c98XVQYd2698",
+    "sub_profile": "ai_agent",
+    "act": {
+      "sub": "0oa15duskmnhzdvvJ698",
+      "sub_profile": "web_app"
+    }
+  }
 }
 ```
 
 ### Step 4 - Request access_token using ID-JAG
 
 ```bash
-
-./token-exchange.sh -d $auth0_domain -c $client_id -x $client_secret -G jwt-bearer -s s1 -A $id_jag
+./token-exchange.sh -d $auth0_domain -c $client_id -x $client_secret -G jwt-bearer -s read -A $id_jag -r urn:todo0:api
 ```
 
 Produced following access_token:
 
 ```json
 {
-  "iss": "https://abbaspour.auth0.com/",
-  "sub": "okta|xaa-idp|00uzekrk6tGSxXmRh1d7",
+  "iss": "https://amin.jp.auth0.com/",
+  "sub": "okta|okta-integrator|00u14j584jskYLAVs698",
   "aud": "urn:todo0:api",
-  "iat": 1780374867,
-  "exp": 1780461267,
-  "jti": "eKy5GYdaz4AscG68xbJ1cm",
-  "client_id": "vlbB747IIDdNvkEqiNgUq5JNmIhH8bob"
+  "iat": 1784527976,
+  "exp": 1784614376,
+  "scope": "read",
+  "jti": "sLBjTu49HWt8WCUCyUuonr",
+  "client_id": "Josz8cBBCWKA6Q7CkhyhYjbKY4hqjXMG"
 }
 ```
 
