@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-declare port=3000
+declare port=1980
 
 function usage() {
     cat <<END >&2

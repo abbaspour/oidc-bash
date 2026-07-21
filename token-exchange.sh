@@ -121,10 +121,34 @@ if [[ ${opt_disable_discovery} -eq 0 ]]; then
   [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
 fi
 
+if [[ "${subject_token_type}" == 'urn:ietf:params:oauth:token-type:saml2' && -n "${subject_token}" ]]; then
+  declare saml_raw_xml=0
+  declare saml_xml=''
+
+  if [[ "${subject_token}" == '<'* ]]; then
+    saml_raw_xml=1
+    saml_xml="${subject_token}"
+  else
+    saml_xml=$(printf '%s' "${subject_token}" | base64 -d 2>/dev/null) || saml_xml=''
+  fi
+
+  if [[ -n "${saml_xml}" && "${saml_xml}" =~ \<[A-Za-z0-9]*:?Response ]]; then
+    command -v xmllint >/dev/null || { echo >&2 "error: xmllint not found (required to extract SAML2 Assertion from Response)"; exit 3; }
+    declare saml_assertion
+    saml_assertion=$(printf '%s' "${saml_xml}" | xmllint --nsclean --xpath "//*[local-name()='Assertion']" - 2>/dev/null) || saml_assertion=''
+    [[ -z "${saml_assertion}" ]] && { echo >&2 "ERROR: unable to locate <Assertion> element inside SAML2 Response"; exit 1; }
+    subject_token=$(printf '%s' "${saml_assertion}" | base64 | tr -d '\n')
+  elif [[ ${saml_raw_xml} -eq 1 ]]; then
+    subject_token=$(printf '%s' "${subject_token}" | base64 | tr -d '\n')
+  fi
+  # else: subject_token is already a base64-encoded SAML2 Assertion; pass through unchanged
+fi
+
 declare client_assertion=''
 declare client_assertion_type=''
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
   declare jwt_ca_assertion
+  # TODO: remove hardcoded /oauth2/v1/token
   jwt_ca_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}/oauth2/v1/token" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   client_assertion="${jwt_ca_assertion}"
   client_assertion_type='urn:ietf:params:oauth:client-assertion-type:jwt-bearer'

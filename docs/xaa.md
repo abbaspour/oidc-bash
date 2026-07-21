@@ -1,4 +1,4 @@
-# Setup
+# OIDC Setup
 
 Follow Auth0 XAA setup guide [here](https://auth0.com/docs/secure/call-apis-on-users-behalf/xaa).
 
@@ -32,7 +32,7 @@ Under Applications > Applications, create a confidential regular web application
 
 ![Auth0 Requesting Application](./images/xaa-3-auth0-req-app.png)
 
-with **Allowed Callback URLs** including `http://localhost:3000/cb`
+with **Allowed Callback URLs** including `http://localhost:1980/cgi-bin/cb.sh`
 
 ![Auth0 Requesting Application Callback](./images/xaa-3-auth0-req-app-cb.png)
 
@@ -80,7 +80,7 @@ Run callback.sh to start listening.
 
 ## Step 1 - Federate from Auth0 to Okta to provision Federated User (one time only)
 ```bash
-./authorize.sh -d $auth0_domain -c $client_id -r $connection -u http://localhost:3000/cgi-bin/cb.sh -C 
+./authorize.sh -d $auth0_domain -c $client_id -r $connection -u http://localhost:1980/cgi-bin/cb.sh -C 
 ```
 Open the browser, paste the URL from clipboard and login with one of the users assigned to the app in setup step 5.
 ![okta login](./images/xaa-demo-01.png)
@@ -93,7 +93,7 @@ Once login is successful, user is provisioned in Auth0.
 
 ```bash
 
-./authorize.sh -d $okta_domain -c $req_app_id -u http://localhost:3000/cgi-bin/cb.sh -C
+./authorize.sh -d $okta_domain -c $req_app_id -u http://localhost:1980/cgi-bin/cb.sh -C
 
 export id_token='....'
 ```
@@ -129,14 +129,18 @@ Sample id_token from Okta will look like this:
 
 ### Step 3 - Request ID-JAG using id_token
 
+#### OIDC
 ```bash
 ./token-exchange.sh -d $okta_domain -c $agent_app_id -k 89799ce500e455d5efdb96f24f93c836 -K xaa2/okta-agent-priv.pem \
   -i $id_token -a https://$auth0_domain/ -s read -p -J
 
 export id_jag=$(./token-exchange.sh -d $okta_domain -c $agent_app_id -k 89799ce500e455d5efdb96f24f93c836 -K xaa2/okta-agent-priv.pem \
   -i $id_token -a https://$auth0_domain/ -s read -p -J | jq -r .access_token)
-
 ```
+
+#### SAML
+./token-exchange.sh -d $okta_domain -c $agent_app_id -k $kid -K xaa-saml1/okta-agent-priv.pem \
+-i $saml -a https://$auth0_domain/ -s read -p -J
 
 Here is a sample full payload of an exchange result 
 ```json  
@@ -192,6 +196,80 @@ Produced following access_token:
   "jti": "sLBjTu49HWt8WCUCyUuonr",
   "client_id": "Josz8cBBCWKA6Q7CkhyhYjbKY4hqjXMG"
 }
+```
+
+# SAML Setup
+```shell
+export connection='okta-saml'                     
+
+export auth0_domain='amin.jp.auth0.com'
+export client_id='Josz8cBBCWKA6Q7CkhyhYjbKY4hqjXMG'    
+export client_secret="fIoC5BkLQ5NontkcTojvyREhekP-tPiN_eefrCOQGmsnK2qAwSO0pQkp71or0qzg"                        
+
+export okta_domain='integrator-4598441.okta.com'
+export agent_app_id='wlp15fk3702lJwVLG698'              
+
+export kid='1f8e5a2320115cfd3b783d1a60d93b67'     
+export private_key="./xaa-saml2/okta-agent-priv.pem"
+
+export saml='....'     
+```
+
+## SAML to refresh_token
+```shell
+./token-exchange.sh -d $okta_domain -c $agent_app_id -k $kid -K $private_key -i $saml -a https://$auth0_domain/ -s openid,offline_access -p -J -u saml2 -U refresh_token -v
+
+export refresh_token=$(./token-exchange.sh -d $okta_domain -c $agent_app_id -k $kid -K $private_key -i $saml -a https://$auth0_domain/ -s openid,offline_access -p -J -u saml2 -U refresh_token | jq -r .access_token)
+```
+
+```json
+{
+  "token_type": "N_A",
+  "expires_in": 2592000,
+  "access_token": "4SsoXJDBgcq0uzMCqJCGzMVV9DPPsjYn2K-p5l_GCdo",
+  "scope": "openid offline_access",
+  "issued_token_type": "urn:ietf:params:oauth:token-type:refresh_token"
+}
+```
+
+```shell
+export refresh_token='xxx'
+
+./token-exchange.sh -d $okta_domain -c $agent_app_id -k $kid -K $private_key -i $refresh_token -a https://$auth0_domain/ -s read -p -J -u refresh_token -v
+
+export id_jag=$(./token-exchange.sh -d $okta_domain -c $agent_app_id -k $kid -K $private_key -i $refresh_token -a https://$auth0_domain/ -s read -p -J -u refresh_token | jq -r .access_token)
+
+```
+
+Sample structure of SAML issued ID-JAG:
+
+```json
+{
+  "jti": "IDAAG.jrdCpdgazbi52j3UxXT_MqgAUMW2n57EZq8RG0ucRnU",
+  "iss": "https://integrator-4598441.okta.com",
+  "aud": "https://amin.jp.auth0.com/",
+  "iat": 1784620622,
+  "exp": 1784620922,
+  "sub": "00u14j584jskYLAVs698",
+  "email": "test-xaa@example.com",
+  "client_id": "Josz8cBBCWKA6Q7CkhyhYjbKY4hqjXMG",
+  "sub_profile": "user",
+  "scope": "read",
+  "act": {
+    "sub": "wlp15fk3702lJwVLG698",
+    "sub_profile": "ai_agent"
+  },
+  "sub_id": {
+    "format": "saml-nameid",
+    "issuer": "http://www.okta.com/exk15fjrhugHeRpO1698",
+    "nameid": "test-xaa@example.com",
+    "nameid_format": "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"
+  }
+}
+```
+
+```shell
+./token-exchange.sh -d $auth0_domain -c $client_id -x $client_secret -G jwt-bearer -s read -A $id_jag -r urn:todo0:api
 ```
 
 # References
