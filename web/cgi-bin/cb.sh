@@ -59,13 +59,15 @@ if [[ -n "$params" ]]; then
         key=$(url_decode "$key")
         value=$(url_decode "$value")
         printf >&2 '  %s = %s\n' "$key" "$value"
-        html_rows+="<tr><td><b>$(html_escape "$key")</b></td><td><code>$(html_escape "$value")</code></td></tr>"
+        html_rows+="<tr><td><b>$(html_escape "$key")</b></td><td><code>$(html_escape "$value")</code> <button type=\"button\" class=\"copy-btn\" title=\"Copy to clipboard\" aria-label=\"Copy to clipboard\">📋</button></td></tr>"
     done
 else
     echo >&2 "  (no ${source_label} parameters)"
     html_rows="<tr><td colspan=\"2\"><i>(no ${source_label} parameters)</i></td></tr>"
 fi
 
+copy_script=''
+[[ -f "${DIR}/../js/copy.js" ]] && copy_script=$(<"${DIR}/../js/copy.js")
 script_content=''
 [[ -f "${DIR}/../js/hash.js" ]] && script_content=$(<"${DIR}/../js/hash.js")
 
@@ -76,9 +78,12 @@ cat <<HTML
 <style>body{font-family:sans-serif;max-width:900px;margin:2em auto;padding:0 1em}
 table{border-collapse:collapse;width:100%}
 td{border:1px solid #ccc;padding:6px 10px;vertical-align:top}
-code{word-break:break-all}</style></head>
+code{word-break:break-all}
+.copy-btn{border:none;background:none;cursor:pointer;font-size:0.9em;padding:0 4px;vertical-align:middle}
+.copy-btn:hover{opacity:0.7}</style></head>
 <body><h1>OIDC Callback</h1>
 <table>${html_rows}</table>
+<script>${copy_script}</script>
 <script>${script_content}</script>
 </body></html>
 HTML

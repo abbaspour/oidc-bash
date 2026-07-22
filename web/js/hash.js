@@ -62,6 +62,14 @@
         code.textContent = v;
         tdK.appendChild(b);
         tdV.appendChild(code);
+        tdV.appendChild(document.createTextNode(' '));
+        var copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'copy-btn';
+        copyBtn.title = 'Copy to clipboard';
+        copyBtn.setAttribute('aria-label', 'Copy to clipboard');
+        copyBtn.textContent = '📋';
+        tdV.appendChild(copyBtn);
         tr.appendChild(tdK);
         tr.appendChild(tdV);
         table.appendChild(tr);

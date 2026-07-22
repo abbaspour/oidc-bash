@@ -37,7 +37,7 @@ You'll see some code duplicate all authenticating against token endpoint however
 | [`token-exchange.sh`](./token-exchange.sh)             | Performs OAuth 2.0 Token Exchange (RFC 8693) to swap one token for another.                                                    |
 | [`revoke-refresh-token.sh`](./revoke-refresh-token.sh) | Revokes a refresh token via the `/oauth/revoke` endpoint.                                                                      |
 | [`logout.sh`](./logout.sh)                             | Performs RP-Initiated Logout via `/oidc/logout` (or federated/SAML logout variants).                                           |
-| [`web/server.sh`](./web/server.sh)                     | Starts a Python CGI HTTP server; serves a callback handler at `/cgi-bin/cb.sh` (default port 3000).                            |
+| [`web/server.sh`](./web/server.sh)                     | Starts a Python CGI HTTP server; serves a callback handler at `/cgi-bin/cb.sh` (default port 1980).                            |
 
 
 # Check
