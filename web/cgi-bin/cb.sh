@@ -70,6 +70,8 @@ copy_script=''
 [[ -f "${DIR}/../js/copy.js" ]] && copy_script=$(<"${DIR}/../js/copy.js")
 script_content=''
 [[ -f "${DIR}/../js/hash.js" ]] && script_content=$(<"${DIR}/../js/hash.js")
+saml_script=''
+[[ -f "${DIR}/../js/saml.js" ]] && saml_script=$(<"${DIR}/../js/saml.js")
 
 printf 'Content-Type: text/html; charset=utf-8\n\n'
 cat <<HTML
@@ -85,5 +87,6 @@ code{word-break:break-all}
 <table>${html_rows}</table>
 <script>${copy_script}</script>
 <script>${script_content}</script>
+<script>${saml_script}</script>
 </body></html>
 HTML
