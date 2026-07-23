@@ -8,7 +8,9 @@
 
 set -eo pipefail
 
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
+readonly DIR
 
 ##
 # prerequisite:
@@ -17,10 +19,10 @@ readonly DIR=$(dirname "${BASH_SOURCE[0]}")
 # 3. ./authorize.sh -t tenant -c client_id
 ##
 
-declare AUTH0_REDIRECT_URI='http://local.abbaspour.net:1980/cgi-bin/cb.sh'
-declare AUTH0_SCOPE='openid profile email'
-declare AUTH0_RESPONSE_TYPE='id_token'
-declare AUTH0_RESPONSE_MODE=''
+declare REDIRECT_URI='http://local.abbaspour.net:1980/cgi-bin/cb.sh'
+declare SCOPE='openid profile email'
+declare RESPONSE_TYPE='id_token'
+declare RESPONSE_MODE=''
 declare authorization_path='authorize'
 declare bc_authorization_path='bc-authorize'
 declare par_path='oauth/par'
@@ -29,16 +31,16 @@ function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-T response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-R mode] [-D] [-P|-m|-M|-C|-N|-o|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
-        -c client_id   # Auth0 client ID
-        -x secret      # Auth0 client secret (for PAR and CIBA)
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain
+        -c client_id   # OAuth2/OIDC client ID
+        -x secret      # OAuth2/OIDC client secret (for PAR and CIBA)
         -a audience    # Audience
         -r realm       # Connection
-        -T types       # comma separated response types (default is "${AUTH0_RESPONSE_TYPE}")
+        -T types       # comma separated response types (default is "${RESPONSE_TYPE}")
         -f flow        # OAuth2 flow type (implicit,code,pkce,hybrid)
-        -u callback    # callback URL (default ${AUTH0_REDIRECT_URI})
-        -s scopes      # comma separated list of scopes (default is "${AUTH0_SCOPE}")
+        -u callback    # callback URL (default ${REDIRECT_URI})
+        -s scopes      # comma separated list of scopes (default is "${SCOPE}")
         -p prompt      # prompt type: none, silent, login, consent
         -R mode        # response_mode of: query, web_message, form_post, fragment
         -S state       # state
@@ -72,7 +74,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
 eg,
      $0 -t amin01@au -s offline_access -o
 END
-    exit $1
+    exit "$1"
 }
 
 urlencode() {
@@ -98,12 +100,12 @@ gen_code_challenge() {
 #declare -r CURL='/opt/homebrew/opt/curl/bin/curl'
 declare -r CURL='curl'
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_CLIENT_SECRET=''
-declare AUTH0_CONNECTION=''
-declare AUTH0_AUDIENCE=''
-declare AUTH0_PROMPT=''
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare CLIENT_SECRET=''
+declare CONNECTION=''
+declare AUDIENCE=''
+declare PROMPT=''
 
 declare opt_clipboard=''
 declare opt_flow='implicit'
@@ -138,18 +140,18 @@ declare opt_disable_discovery=0
 while getopts "e:t:d:c:x:a:r:R:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
-    t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
-    d) AUTH0_DOMAIN=${OPTARG} ;;
-    c) AUTH0_CLIENT_ID=${OPTARG} ;;
-    x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
-    a) AUTH0_AUDIENCE=${OPTARG} ;;
-    r) AUTH0_CONNECTION=${OPTARG} ;;
-    T) AUTH0_RESPONSE_TYPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
+    t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
+    d) DOMAIN=${OPTARG} ;;
+    c) CLIENT_ID=${OPTARG} ;;
+    x) CLIENT_SECRET=${OPTARG} ;;
+    a) AUDIENCE=${OPTARG} ;;
+    r) CONNECTION=${OPTARG} ;;
+    T) RESPONSE_TYPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     f) opt_flow=${OPTARG} ;;
-    u) AUTH0_REDIRECT_URI=${OPTARG} ;;
-    p) AUTH0_PROMPT=${OPTARG} ;;
-    R) AUTH0_RESPONSE_MODE=${OPTARG} ;;
-    s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
+    u) REDIRECT_URI=${OPTARG} ;;
+    p) PROMPT=${OPTARG} ;;
+    R) RESPONSE_MODE=${OPTARG} ;;
+    s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     S) opt_state=${OPTARG} ;;
     n) opt_nonce=${OPTARG} ;;
     H) opt_login_hint=${OPTARG} ;;
@@ -181,8 +183,8 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOP
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
+[[ -z "${DOMAIN}" ]] && {  echo >&2 "ERROR: DOMAIN undefined";  usage 1;  }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined";  usage 1; }
 
 # Read authorization_details from file if provided
 if [[ -n "${authorization_details}" ]]; then
@@ -193,21 +195,21 @@ if [[ -n "${authorization_details}" ]]; then
     authorization_details=$(jq -c . "${authorization_details}")
 fi
 
-[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+[[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
 
-declare issuer="${AUTH0_DOMAIN}"
+declare issuer="${DOMAIN}"
 [[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
 # Default endpoints derived from domain and paths
-declare par_endpoint="${AUTH0_DOMAIN}/${par_path}"
-declare authorization_endpoint="${AUTH0_DOMAIN}/${authorization_path}"
-declare bc_authorization_endpoint="${AUTH0_DOMAIN}/${bc_authorization_path}"
+declare par_endpoint="${DOMAIN}/${par_path}"
+declare authorization_endpoint="${DOMAIN}/${authorization_path}"
+declare bc_authorization_endpoint="${DOMAIN}/${bc_authorization_path}"
 
 # OIDC Discovery (unless disabled with -D)
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
     # Use -k to allow dev environments with self-signed; consistent with later curl usage
     declare discovery_json
-    discovery_json=$(${CURL} -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
+    discovery_json=$(${CURL} -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
 
     # Extract fields if present
     d_authz=$(echo "${discovery_json}" | jq -r '.authorization_endpoint // empty')
@@ -223,8 +225,8 @@ if [[ ${opt_disable_discovery} -eq 0 ]]; then
 fi
 
 if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
-  declare signon_url="${AUTH0_DOMAIN}/${protocol}/${AUTH0_CLIENT_ID}"
-  [[ -n "${AUTH0_CONNECTION}" ]] && signon_url+="?connection=${AUTH0_CONNECTION}"
+  declare signon_url="${DOMAIN}/${protocol}/${CLIENT_ID}"
+  [[ -n "${CONNECTION}" ]] && signon_url+="?connection=${CONNECTION}"
 
   echo "${signon_url}"
   [[ -n "${opt_clipboard}" ]] && echo "${signon_url}" | pbcopy
@@ -232,15 +234,15 @@ if [[ "${protocol}" != "oauth" && "${protocol}" != "oidc" ]]; then
   exit 0
 fi
 
-[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/api/v2/"
-[[ -n "${opt_mfa_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/mfa/"
-[[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/me/"
-[[ -n "${opt_myorg_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/my-org/"
+[[ -n "${opt_mgmnt}" ]] && AUDIENCE="${DOMAIN}/api/v2/"
+[[ -n "${opt_mfa_api}" ]] && AUDIENCE="${DOMAIN}/mfa/"
+[[ -n "${opt_myaccount_api}" ]] && AUDIENCE="${DOMAIN}/me/"
+[[ -n "${opt_myorg_api}" ]] && AUDIENCE="${DOMAIN}/my-org/"
 
 declare response_param=''
 
 case ${opt_flow} in
-implicit) response_param="response_type=$(urlencode "${AUTH0_RESPONSE_TYPE}")" ;;
+implicit) response_param="response_type=$(urlencode "${RESPONSE_TYPE}")" ;;
 *code) response_param='response_type=code' ;;
 pkce | hybrid)
     code_verifier=$(gen_code_verifier)
@@ -262,12 +264,12 @@ fi
 
 
 # shellcheck disable=SC2155
-declare authorize_params="client_id=${AUTH0_CLIENT_ID}&${response_param}&nonce=$(urlencode ${opt_nonce})&redirect_uri=$(urlencode ${AUTH0_REDIRECT_URI})&scope=$(urlencode "${AUTH0_SCOPE}")"
+declare authorize_params="client_id=${CLIENT_ID}&${response_param}&nonce=$(urlencode "${opt_nonce}")&redirect_uri=$(urlencode "${REDIRECT_URI}")&scope=$(urlencode "${SCOPE}")"
 
-[[ -n "${AUTH0_AUDIENCE}" ]] && authorize_params+="&audience=$(urlencode "${AUTH0_AUDIENCE}")"
-[[ -n "${AUTH0_CONNECTION}" ]] && authorize_params+="&connection=${AUTH0_CONNECTION}"
-[[ -n "${AUTH0_PROMPT}" ]] && authorize_params+="&prompt=${AUTH0_PROMPT}"
-[[ -n "${AUTH0_RESPONSE_MODE}" ]] && authorize_params+="&response_mode=${AUTH0_RESPONSE_MODE}"
+[[ -n "${AUDIENCE}" ]] && authorize_params+="&audience=$(urlencode "${AUDIENCE}")"
+[[ -n "${CONNECTION}" ]] && authorize_params+="&connection=${CONNECTION}"
+[[ -n "${PROMPT}" ]] && authorize_params+="&prompt=${PROMPT}"
+[[ -n "${RESPONSE_MODE}" ]] && authorize_params+="&response_mode=${RESPONSE_MODE}"
 [[ -n "${opt_state}" ]] && authorize_params+="&state=$(urlencode "${opt_state}")"
 [[ -n "${opt_login_hint}" ]] && authorize_params+="&login_hint=$(urlencode "${opt_login_hint}")"
 [[ -n "${opt_id_token_hint}" ]] && authorize_params+="&id_token_hint=$(urlencode "${opt_id_token_hint}")"
@@ -283,9 +285,10 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
   [[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
   [[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
   [[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
-  readonly tmp_jwt=$(mktemp --suffix=.json)
+  tmp_jwt=$(mktemp --suffix=.json)
+  readonly tmp_jwt
   # shellcheck disable=SC2129
-  printf "{\n \"iss\":\"%s\", \n " "${AUTH0_CLIENT_ID}" >> "${tmp_jwt}"
+  printf "{\n \"iss\":\"%s\", \n " "${CLIENT_ID}" >> "${tmp_jwt}"
   echo "${authorize_params}" | awk -F'[=&]' '{
                                  for (i=1;i<=NF;i+=2) {
                                    gsub(/\+/," ",$(i+1))
@@ -295,30 +298,38 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
                                    printf("\"%s\":\"%s\",\n ", $i, $(i+1))
                                  }
                                }' >> "${tmp_jwt}"
-  readonly jar_exp=$(date +%s --date='5 minutes')
-  readonly jar_now=$(date +%s)
+  jar_exp=$(date +%s --date='5 minutes')
+  readonly jar_exp
+  jar_now=$(date +%s)
+  readonly jar_now
   echo "\"aud\": \"${issuer}\", \"iat\": ${jar_now}, \"exp\": ${jar_exp}, \"nbf\": ${jar_now} }"  >> "${tmp_jwt}"
   signed_request=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${tmp_jwt}" -k "${key_id}" -t oauth-authz-req+jwt -A PS256)
   readonly signed_request
   echo "$signed_request"
-  authorize_params="client_id=${AUTH0_CLIENT_ID}&request=${signed_request}"
+  authorize_params="client_id=${CLIENT_ID}&request=${signed_request}"
 fi
 
-if [[ -n "${AUTH0_CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
-  authorize_params+="&client_secret=${AUTH0_CLIENT_SECRET}"
+if [[ -n "${CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
+  authorize_params+="&client_secret=${CLIENT_SECRET}"
 elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
-  declare -r signed_client_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
+  declare signed_client_assertion
+  signed_client_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
+  readonly signed_client_assertion
   authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 fi
 
 if [[ ${opt_par} -ne 0 ]]; then                       # PAR
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
+  [[ -n "${opt_verbose}" ]] && echo >&2 "> POST ${par_endpoint} ${authorize_params}"
+
   #  --tlsv1.2 --cert transport.pem --key transport.key --cacert connectid-sandbox-ca.pem
   #  --header "x-fapi-interaction-id: $(random32)" \
-  declare -r request_uri=$("${CURL}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
+  declare request_uri
+  request_uri=$("${CURL}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
     -d "${authorize_params}" | jq -r '.request_uri')
-  authorize_params="client_id=${AUTH0_CLIENT_ID}&request_uri=${request_uri}"
+  readonly request_uri
+  authorize_params="client_id=${CLIENT_ID}&request_uri=${request_uri}"
 
 elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
   [[ -z "${opt_login_hint}" ]] && { echo >&2 "login_hint required for CIBA"; exit 1; }
@@ -327,8 +338,12 @@ elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
 
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
-  declare -r auth_req_id=$("${CURL}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
+  [[ -n "${opt_verbose}" ]] && echo >&2 "> POST ${bc_authorization_endpoint} ${authorize_params}"
+
+  declare auth_req_id
+  auth_req_id=$("${CURL}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
     -d "${authorize_params}" | jq -r '.auth_req_id')
+  readonly auth_req_id
 
   echo "auth_req_id: ${auth_req_id}"
   exit 0

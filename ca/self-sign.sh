@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
 
 set -eo pipefail
@@ -22,10 +23,11 @@ eg,
      $0 -n backend-api
      $0 -n backend-api -e
 END
-    exit $1
+    exit "$1"
 }
 
-declare pair_name=$(hostname)
+declare pair_name
+pair_name=$(hostname)
 declare opt_verbose=0
 declare ec_mode=0
 declare key_type_prefix="rsa" # Default prefix

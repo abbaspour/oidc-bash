@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2025-08-18
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
 
 set -euo pipefail
@@ -21,7 +22,7 @@ USAGE: $0 [-i key.jks] [-o key.pem] [-v|-h]
 eg,
      $0 -f mykey.jks -o mykey-pkcs8.pem
 END
-    exit $1
+    exit "$1"
 }
 
 declare input_file

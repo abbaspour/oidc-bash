@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2025-08-18
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
 
 set -euo pipefail
@@ -26,13 +27,14 @@ USAGE: $0 [-f json] [-i iss] [-a aud] [-k kid] [-p private-key] [-v|-h]
 eg,
      $0 -f file.json -a http://my.api -i http://some.issuer -k 1 -p ../ca/myapi-private.pem
 END
-    exit $1
+    exit "$1"
 }
 
 # Token validity (seconds)
 declare -i TTL=100
+declare typ='JWT'
 
-while getopts "f:i:a:k:p:t:hv?" opt; do
+while getopts "f:i:a:k:p:t:T:hv?" opt; do
     case ${opt} in
     f) json_file=${OPTARG} ;;
     i) CLIENT_ID=${OPTARG} ;;
@@ -49,7 +51,7 @@ done
 
 [[ -z "${KID}" ]] && { echo >&2 "ERROR: KID undefined.";  usage 1; }
 
-[[ -f "${ORIG_KEY}" ]] || { echo >&2 "ERROR: ORIG_KEY missing: ${pem_file}"; usage 1; }
+[[ -f "${ORIG_KEY}" ]] || { echo >&2 "ERROR: ORIG_KEY missing: ${ORIG_KEY}"; usage 1; }
 [[ -z "${json_file}" ]] && { echo >&2 "ERROR: json_file undefined";  usage 1; }
 
 [[ ! -f "${json_file}" ]] && { echo >&2 "json_file: unable to read file: ${json_file}";  usage 1; }
@@ -65,7 +67,7 @@ const jwk = JSON.parse(fs.readFileSync("${ORIG_KEY}", 'utf8'))
 const key = await parseJwk(jwk, 'ES256');
 
 const signature = await new SignJWT({})
-    .setProtectedHeader({alg: 'ES256', kid: "${KID}", typ: 'JWT'})
+    .setProtectedHeader({alg: 'ES256', kid: "${KID}", typ: "${typ}"})
     .setIssuedAt()
     .setIssuer("${CLIENT_ID}")
     .setSubject("${CLIENT_ID}")

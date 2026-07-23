@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
 
 set -eu #o pipefail
@@ -24,7 +25,7 @@ USAGE: $0 [-f file] [-s secret] [-k kid] [-e exp]
 eg,
      $0 -f file.json -s hardsecret
 END
-    exit $1
+    exit "$1"
 }
 
 declare opt_verbose=0
@@ -46,10 +47,14 @@ done
 
 
 # header
-declare -r header=$(printf '{"alg": "%s", "typ": "JWT"}' "${algorithm}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+declare header
+header=$(printf '{"alg": "%s", "typ": "JWT"}' "${algorithm}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+readonly header
 
 # body
-declare -r body=$(cat "${file}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+declare body
+body=$(openssl base64 -e -A < "${file}" | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+readonly body
 
 # signature
 declare signature=''

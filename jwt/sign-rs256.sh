@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12 (Modified: 2024-10-25)
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
 
 set -eo pipefail
@@ -29,7 +30,7 @@ USAGE: $0 [-f json] [-i iss] [-a aud] [-k kid] [-p private-key] [-v|-h]
 eg,
      $0 -f file.json -a http://my.api -i http://some.issuer -k 1 -p ../ca/myapi-private.pem
 END
-    exit $1
+    exit "$1"
 }
 
 b64url(){ openssl base64 -A | tr '+/' '-_' | tr -d '='; }
@@ -64,7 +65,8 @@ done
 
 
 # header
-readonly header=$(
+declare header
+header=$(
   jq -n \
     --arg typ "${typ}" \
     --arg alg "${alg}" \
@@ -75,11 +77,27 @@ readonly header=$(
     + ( if ($kid | length) > 0 then { kid: $kid } else {} end )
     ' | b64url
 )
+readonly header
 
 # body
-declare -r body=$(cat "${json_file}" | b64url)
+declare body_json
+body_json=$(
+  jq -c \
+    --arg iss "${iss}" \
+    --arg aud "${aud}" \
+    '
+    . + ( if ($iss | length) > 0 then { iss: $iss } else {} end )
+      + ( if ($aud | length) > 0 then { aud: $aud } else {} end )
+    ' "${json_file}"
+)
+readonly body_json
 
-declare alg_lower=$(echo -n "$alg" | tr '[:upper:]' '[:lower:]')
+declare body
+body=$(echo -n "${body_json}" | b64url)
+readonly body
+
+declare alg_lower
+alg_lower=$(echo -n "$alg" | tr '[:upper:]' '[:lower:]')
 
 declare signature=''
 if [[ ${alg_lower} != 'none' ]]; then

@@ -74,16 +74,13 @@ fi
 # --- Main Script Logic ---
 
 # 1. Derive Public Key from the Private Key
-PUBLIC_KEY=$(${OPENSSL_CMD} ec -in "${PRIVATE_KEY_FILE}" -pubout 2>/dev/null)
-if [ $? -ne 0 ]; then
-    fail "Failed to derive public key from the private key."
-fi
+PUBLIC_KEY=$(${OPENSSL_CMD} ec -in "${PRIVATE_KEY_FILE}" -pubout 2>/dev/null) || fail "Failed to derive public key from the private key."
 
 # 2. Extract EC key parameters (crv, x, y) to build the JWK.
 # We use openssl to get the key details in a parsable format.
 # The curve name from OpenSSL needs to be mapped to the RFC JWK 'crv' name.
 # For prime256v1 (secp256r1), the crv is "P-256".
-CURVE_NAME=$(cat "${PRIVATE_KEY_FILE}" | ${OPENSSL_CMD} ec -noout -text 2>/dev/null | grep "ASN1 OID" | awk '{print $3}')
+CURVE_NAME=$(${OPENSSL_CMD} ec -noout -text < "${PRIVATE_KEY_FILE}" 2>/dev/null | grep "ASN1 OID" | awk '{print $3}')
 case ${CURVE_NAME} in
     "prime256v1")
         CRV="P-256"
@@ -94,7 +91,8 @@ case ${CURVE_NAME} in
         ;;
 esac
 
-readonly coords="$(echo "${PUBLIC_KEY}" | ${OPENSSL_CMD} ec -pubin -noout -text -conv_form uncompressed 2>/dev/null | grep -E "^ +.*" | tr -d ' \n' | sed 's/^...//' | tr -d ':')"
+coords="$(echo "${PUBLIC_KEY}" | ${OPENSSL_CMD} ec -pubin -noout -text -conv_form uncompressed 2>/dev/null | grep -E "^ +.*" | tr -d ' \n' | sed 's/^...//' | tr -d ':')"
+readonly coords
 
 readonly X_HEX=${coords:0:${#coords}/2} # first half
 readonly Y_HEX=${coords:${#coords}/2}   # second half

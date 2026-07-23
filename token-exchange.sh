@@ -10,18 +10,20 @@ set -eo pipefail
 
 command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
 command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
+readonly DIR
 
-declare AUTH0_SCOPE='openid profile email'
+declare SCOPE='openid profile email'
 
 function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-k kid] [-K private.pem] [-i subject_token] [-I type] [-u name] [-U name] [-g grant_type] [-G name] [-A assertion] [-a audience] [-r resource] [-s scope] [-R|-J|-f realm|-p|-D|-h|-v]
         -e file               # .env file location (default cwd)
-        -t tenant             # Auth0 tenant@region
-        -d domain             # Auth0 domain
-        -c client_id          # Auth0 client ID
-        -x secret             # Auth0 client secret
+        -t tenant             # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain             # OIDC provider domain
+        -c client_id          # OAuth2/OIDC client ID
+        -x secret             # OAuth2/OIDC client secret
         -k kid                # client public key JWT-CA key id
         -K private.pem        # JWT-CA client private key file for client assertion
         -i subject_token      # subject_token value
@@ -33,25 +35,25 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-k
         -A assertion          # assertion value (added as "assertion" in request body)
         -R                    # shortcut: subject is refresh_token (= -u refresh_token)
         -J                    # ID-JAG mode: subject=id_token, requested=id-jag
-        -f realm              # FCAT (Token Vault) mode + connection name
+        -f realm              # FCAT (Token Vault) mode + connection name (Auth0-specific grant/token-type)
         -p                    # HTTP form post (default is application/json)
         -D                    # disable OIDC discovery; use default endpoint /oauth/token
         -a audience           # Audience
         -r resource           # Resource (RFC-8707 / RFC-8693 resource parameter)
-        -s scopes             # comma separated list of scopes (default is "${AUTH0_SCOPE}")
+        -s scopes             # comma separated list of scopes (default is "${SCOPE}")
         -h|?                  # usage
         -v                    # verbose
 
 eg,
      $0 -t amin01@au -c client_id -x client_secret -i ey... -A -a newapi -s read:things
 END
-    exit $1
+    exit "$1"
 }
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_CLIENT_SECRET=''
-declare AUTH0_AUDIENCE=''
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare CLIENT_SECRET=''
+declare AUDIENCE=''
 
 declare subject_token=''
 declare subject_token_type=''
@@ -73,13 +75,13 @@ declare opt_disable_discovery=0
 while getopts "e:t:d:c:x:k:K:a:i:I:u:U:g:G:A:s:f:r:RJpDhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
-    t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
-    d) AUTH0_DOMAIN=${OPTARG} ;;
-    c) AUTH0_CLIENT_ID=${OPTARG} ;;
-    x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
+    t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
+    d) DOMAIN=${OPTARG} ;;
+    c) CLIENT_ID=${OPTARG} ;;
+    x) CLIENT_SECRET=${OPTARG} ;;
     k) kid=${OPTARG} ;;
     K) private_pem=${OPTARG} ;;
-    a) AUTH0_AUDIENCE=${OPTARG} ;;
+    a) AUDIENCE=${OPTARG} ;;
     r) resource=${OPTARG} ;;
     i) subject_token=${OPTARG} ;;
     I) subject_token_type=${OPTARG} ;;
@@ -91,7 +93,7 @@ while getopts "e:t:d:c:x:k:K:a:i:I:u:U:g:G:A:s:f:r:RJpDhv?" opt; do
     R) subject_token_type='urn:ietf:params:oauth:token-type:refresh_token' ;;
     J) subject_token_type='urn:ietf:params:oauth:token-type:id_token';
        requested_token_type='urn:ietf:params:oauth:token-type:id-jag' ;;
-    s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
+    s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     f) grant_type='urn:auth0:params:oauth:grant-type:token-exchange:federated-connection-access-token';
        requested_token_type='http://auth0.com/oauth/token-type/federated-connection-access-token';
        realm=${OPTARG} ;;
@@ -103,20 +105,22 @@ while getopts "e:t:d:c:x:k:K:a:i:I:u:U:g:G:A:s:f:r:RJpDhv?" opt; do
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
+[[ -z "${DOMAIN}" ]] && {  echo >&2 "ERROR: DOMAIN undefined";  usage 1;  }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined";  usage 1; }
 
-[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+[[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
 
-declare token_endpoint="${AUTH0_DOMAIN}/oauth/token"
-declare issuer="${AUTH0_DOMAIN}"
+declare token_endpoint="${DOMAIN}/oauth/token"
+declare issuer="${DOMAIN}"
 [[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
-  discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
-  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
-  declare d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+  discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
+  declare d_token
+  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare d_issuer
+  d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
   [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
 fi
@@ -149,7 +153,7 @@ declare client_assertion_type=''
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
   declare jwt_ca_assertion
   # TODO: remove hardcoded /oauth2/v1/token
-  jwt_ca_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}/oauth2/v1/token" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  jwt_ca_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}/oauth2/v1/token" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   client_assertion="${jwt_ca_assertion}"
   client_assertion_type='urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
 fi
@@ -157,15 +161,15 @@ fi
 declare BODY
 BODY=$(jq -n \
   --arg grant_type "${grant_type}" \
-  --arg client_id "${AUTH0_CLIENT_ID}" \
-  --arg client_secret "${AUTH0_CLIENT_SECRET}" \
+  --arg client_id "${CLIENT_ID}" \
+  --arg client_secret "${CLIENT_SECRET}" \
   --arg subject_token "${subject_token}" \
   --arg subject_token_type "${subject_token_type}" \
   --arg requested_token_type "${requested_token_type}" \
-  --arg audience "${AUTH0_AUDIENCE}" \
+  --arg audience "${AUDIENCE}" \
   --arg resource "${resource}" \
   --arg connection "${realm}" \
-  --arg scope "${AUTH0_SCOPE}" \
+  --arg scope "${SCOPE}" \
   --arg assertion "${assertion}" \
   --arg client_assertion "${client_assertion}" \
   --arg client_assertion_type "${client_assertion_type}" \
@@ -185,7 +189,10 @@ BODY=$(jq -n \
      client_assertion_type: $client_assertion_type
    } | with_entries(select(.value != ""))')
 
-[[ -n "${opt_verbose}" ]] && echo "$BODY" | jq .
+if [[ -n "${opt_verbose}" ]]; then
+  echo >&2 "> POST ${token_endpoint}"
+  echo "$BODY" | jq . >&2
+fi
 
 if [[ ${form_post} -eq 1 ]]; then
   BODY=$(echo "${BODY}" | jq -r 'to_entries | map("\(.key)=\(.value|tostring|@uri)") | join("&")')

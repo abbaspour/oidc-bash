@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
 
 set -eo pipefail
 
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
+readonly DIR
 
 command -v openssl >/dev/null || { echo >&2 "error: openssl not found"; exit 3; }
 command -v sed >/dev/null || { echo >&2 "error: sed not found"; exit 3; }
@@ -32,7 +35,7 @@ USAGE: $0 [-e env] [-a audience] [-i client_id] [-f file] [-k kid] [-A alg] [-t 
 eg,
      $0 -t abbaspour -i 6KS0YSEQwsvE9qRqtzonX8SEgJEYVzVH -k mykid -f ../ca/mydomain.local.key
 END
-    exit $1
+    exit "$1"
 }
 
 declare AUDIENCE=''
@@ -44,7 +47,7 @@ declare opt_verbose=''
 while getopts "e:t:a:i:f:k:A:hv?" opt
 do
     case ${opt} in
-        e) source ${OPTARG};;
+        e) source "${OPTARG}";;
         a) AUDIENCE="${OPTARG}";;
         i) client_id=${OPTARG};;
         f) pem_file=${OPTARG};;
@@ -64,17 +67,23 @@ done
 [[ -z "${pem_file}" ]] && { echo >&2 "ERROR: pem_file undefined."; usage 1; }
 [[ -f "${pem_file}" ]] || { echo >&2 "ERROR: pem_file missing: ${pem_file}"; usage 1; }
 
-[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+[[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
 
 declare ALG="${alg^^}"
 
-declare -r now=$(date +%s);
-declare -r exp=$((now + TTL));
-declare -r JTI="$(openssl rand -hex 16)"
+declare now
+now=$(date +%s)
+readonly now
+declare -r exp=$((now + TTL))
+declare JTI
+JTI="$(openssl rand -hex 16)"
+readonly JTI
 
-readonly body=$(printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${client_id}" "${client_id}" "${AUDIENCE}" "${exp}" "${JTI}")
+body=$(printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${client_id}" "${client_id}" "${AUDIENCE}" "${exp}" "${JTI}")
+readonly body
 
-readonly json=$(mktemp --suffix=.json)
+json=$(mktemp --suffix=.json)
+readonly json
 
 echo "${body}" > "${json}"
 

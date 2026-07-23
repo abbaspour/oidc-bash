@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2025-10-13
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
 
 # https://datatracker.ietf.org/doc/html/rfc9728
@@ -12,35 +12,38 @@ set -eo pipefail
 
 command -v curl >/dev/null || { echo >&2 "error: curl not found";  exit 3; }
 command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
+
 function usage() {
     cat <<END >&2
 USAGE: $0 [-e file] [-t tenant] [-d domain]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain
         -h|?           # usage
         -v             # verbose
 
 eg,
      $0 -t amin01@au
 END
-    exit $1
+    exit "$1"
 }
 
-declare AUTH0_DOMAIN=''
+declare DOMAIN=''
 declare opt_verbose=0
 
 while getopts "e:t:d:hv?" opt; do
     case ${opt} in
-    e) source ${OPTARG} ;;
-    t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
-    d) AUTH0_DOMAIN=${OPTARG} ;;
+    e) source "${OPTARG}" ;;
+    t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
+    d) DOMAIN=${OPTARG} ;;
     v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
+[[ -z "${DOMAIN}" ]] && {  echo >&2 "ERROR: DOMAIN undefined";  usage 1;  }
 
-curl -s https://${AUTH0_DOMAIN}/.well-known/oauth-authorization-server | jq '.'
+[[ -n "${opt_verbose}" ]] && echo >&2 "> GET https://${DOMAIN}/.well-known/oauth-authorization-server"
+
+curl -s "https://${DOMAIN}/.well-known/oauth-authorization-server" | jq '.'

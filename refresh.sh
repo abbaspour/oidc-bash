@@ -9,16 +9,18 @@
 
 set -ueo pipefail
 
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
+readonly DIR
 
 function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-r refresh_token] [-s scopes] [-a audience] [-P dpop.pem] [-g] [-v|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
-        -c client_id   # Auth0 client ID
-        -x secret      # Auth0 client secret (optional for public clients)
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain
+        -c client_id   # OAuth2/OIDC client ID
+        -x secret      # OAuth2/OIDC client secret (optional for public clients)
         -r token       # refresh_token
         -a audience    # Audience (for MRRT)
         -s scopes      # comma separated list of scopes
@@ -31,16 +33,16 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-r
 eg,
      $0 -t amin01@au -c aIioQEeY7nJdX78vcQWDBcAqTABgKnZl -x XXXXXX -r RRRRRRR
 END
-    exit $1
+    exit "$1"
 }
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_CLIENT_SECRET=''
-declare AUTH0_AUDIENCE=''
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare CLIENT_SECRET=''
+declare AUDIENCE=''
 declare opt_verbose=''
 declare refresh_token=''
-declare AUTH0_SCOPE=''
+declare SCOPE=''
 declare enable_session_transfer=0
 declare token_endpoint_path='oauth/token'
 declare opt_disable_discovery=0
@@ -51,13 +53,13 @@ declare dpop_pem_file=''
 while getopts "e:t:d:c:r:a:x:s:P:Dghv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
-    t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
-    d) AUTH0_DOMAIN=${OPTARG} ;;
-    c) AUTH0_CLIENT_ID=${OPTARG} ;;
-    x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
+    t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
+    d) DOMAIN=${OPTARG} ;;
+    c) CLIENT_ID=${OPTARG} ;;
+    x) CLIENT_SECRET=${OPTARG} ;;
     r) refresh_token=${OPTARG} ;;
-    a) AUTH0_AUDIENCE=${OPTARG} ;;
-    s) AUTH0_SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
+    a) AUDIENCE=${OPTARG} ;;
+    s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     P) dpop_pem_file=${OPTARG} ;;
     D) opt_disable_discovery=1 ;;
     g) enable_session_transfer=1 ;;
@@ -67,35 +69,37 @@ while getopts "e:t:d:c:r:a:x:s:P:Dghv?" opt; do
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
+[[ -z "${DOMAIN}" ]] && {  echo >&2 "ERROR: DOMAIN undefined";  usage 1;  }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined";  usage 1; }
 [[ -z "${refresh_token}" ]] && { echo >&2 "ERROR: refresh_token undefined";  usage 1; }
 
-[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
-declare token_endpoint="${AUTH0_DOMAIN}/${token_endpoint_path}"
+[[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
+declare token_endpoint="${DOMAIN}/${token_endpoint_path}"
 
 # OIDC Discovery to resolve token endpoint (unless disabled via -D)
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
-  discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
-  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
+  declare d_token
+  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
 fi
 
 declare secret=''
-[[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${AUTH0_CLIENT_SECRET}\","
+[[ -n "${CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${CLIENT_SECRET}\","
 
 declare scope=''
-[[ -n "${AUTH0_SCOPE}" ]] && scope="\"scope\":\"${AUTH0_SCOPE}\","
+[[ -n "${SCOPE}" ]] && scope="\"scope\":\"${SCOPE}\","
 
 declare audience=''
-[[ -n "${AUTH0_AUDIENCE}" ]] && audience="\"audience\":\"${AUTH0_AUDIENCE}\","
+[[ -n "${AUDIENCE}" ]] && audience="\"audience\":\"${AUDIENCE}\","
 
-[[ ${enable_session_transfer} -eq 1 ]] && audience="\"audience\":\"urn:${AUTH0_DOMAIN}:session_transfer\","
+[[ ${enable_session_transfer} -eq 1 ]] && audience="\"audience\":\"urn:${DOMAIN}:session_transfer\","
 
-declare BODY=$(cat <<EOL
+declare BODY
+BODY=$(cat <<EOL
 {
-    "client_id":"${AUTH0_CLIENT_ID}",
+    "client_id":"${CLIENT_ID}",
     ${secret}
     "refresh_token": "${refresh_token}",
     ${scope}
@@ -105,12 +109,15 @@ declare BODY=$(cat <<EOL
 EOL
 )
 
-[[ "${opt_verbose}" ]] && echo "${BODY}"
+if [[ -n "${opt_verbose}" ]]; then
+    echo >&2 "> POST ${token_endpoint}"
+    echo >&2 "${BODY}"
+fi
 
 declare dpop_header=''
 if [[ -n "${dpop_pem_file}" ]]; then
     dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}")"
-    [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
+    [[ -n "${opt_verbose}" ]] && echo >&2 "${dpop_header}"
 fi
 
 if [[ -n "${dpop_pem_file}" ]]; then
@@ -127,7 +134,7 @@ if [[ -n "${dpop_pem_file}" ]]; then
   rm -f "${_dpop_hdr_file}"
   if [[ -n "${_dpop_nonce}" ]]; then
     dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
-    [[ -n "${opt_verbose}" ]] && echo "${dpop_header}"
+    [[ -n "${opt_verbose}" ]] && echo >&2 "${dpop_header}"
     curl -s --request POST \
       -H "${dpop_header}" \
       --url "${token_endpoint}" \

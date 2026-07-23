@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
@@ -11,24 +12,26 @@ set -eo pipefail
 command -v curl >/dev/null || { echo >&2 "error: curl not found"; exit 3; }
 command -v jq >/dev/null || { echo >&2 "error: jq not found"; exit 3; }
 
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
+readonly DIR
 
-declare AUTH0_SCOPE='openid profile email'
-declare AUTH0_CONNECTION='Username-Password-Authentication'
+declare SCOPE='openid profile email'
+declare CONNECTION='Username-Password-Authentication'
 
 function usage() {
   cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p password] [-x client_secret] [-a audience] [-r connection] [-s scope] [-i IP] [-m|-M|-O|-h|-v]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
-        -c client_id   # Auth0 client ID
-        -x secret      # Auth0 client secret
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain
+        -c client_id   # OAuth2/OIDC client ID
+        -x secret      # OAuth2/OIDC client secret
         -u username    # Username or email
         -p password    # Password
         -a audience    # Audience
-        -r realm       # Connection (default is "${AUTH0_CONNECTION}")
-        -s scopes      # comma separated list of scopes (default is "${AUTH0_SCOPE}")
+        -r realm       # Connection (default is "${CONNECTION}")
+        -s scopes      # comma separated list of scopes (default is "${SCOPE}")
         -i IP          # set origin IP header. Default is 'x-forwarded-for'
         -n api_key     # cname-api-key
         -A             # switch to 'auth0-forwarded-for' for trust IP header
@@ -46,13 +49,13 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p pass
 eg,
      $0 -t amin01@au -s offline_access -c XXXX -u user -p pass
 END
-  exit $1
+  exit "$1"
 }
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_CLIENT_SECRET=''
-declare AUTH0_AUDIENCE=''
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare CLIENT_SECRET=''
+declare AUDIENCE=''
 
 declare username=''
 declare password=''
@@ -77,15 +80,15 @@ declare opt_verbose=''
 while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:K:C:DSAmMOhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
-  t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
+  t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
   u) username=${OPTARG} ;;
   p) password=${OPTARG} ;;
-  d) AUTH0_DOMAIN=${OPTARG} ;;
-  c) AUTH0_CLIENT_ID=${OPTARG} ;;
-  x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
-  a) AUTH0_AUDIENCE=${OPTARG} ;;
-  r) AUTH0_CONNECTION=${OPTARG} ;;
-  s) AUTH0_SCOPE=$(echo ${OPTARG} | tr ',' ' ') ;;
+  d) DOMAIN=${OPTARG} ;;
+  c) CLIENT_ID=${OPTARG} ;;
+  x) CLIENT_SECRET=${OPTARG} ;;
+  a) AUDIENCE=${OPTARG} ;;
+  r) CONNECTION=${OPTARG} ;;
+  s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
   i) origin_ip=${OPTARG} ;;
   n) cname_api_key=${OPTARG} ;;
   k) kid=${OPTARG} ;;
@@ -103,53 +106,58 @@ while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:K:C:DSAmMOhv?" opt; do
   esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && { echo >&2 "ERROR: AUTH0_DOMAIN undefined"; usage 1; }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined"; usage 1; }
+[[ -z "${DOMAIN}" ]] && { echo >&2 "ERROR: DOMAIN undefined"; usage 1; }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined"; usage 1; }
 [[ -z "${username}" ]] && { echo >&2 "ERROR: username undefined"; usage 1; }
 
-[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+[[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
 
-[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="https://${AUTH0_DOMAIN}/api/v2/"
-[[ -n "${opt_myaccount_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/me/"
-[[ -n "${opt_myorg_api}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}/my-org/"
+[[ -n "${opt_mgmnt}" ]] && AUDIENCE="https://${DOMAIN}/api/v2/"
+[[ -n "${opt_myaccount_api}" ]] && AUDIENCE="${DOMAIN}/me/"
+[[ -n "${opt_myorg_api}" ]] && AUDIENCE="${DOMAIN}/my-org/"
 
 
-declare token_endpoint="${AUTH0_DOMAIN}/${token_endpoint_path}"
-declare issuer="${AUTH0_DOMAIN}"
+declare token_endpoint="${DOMAIN}/${token_endpoint_path}"
+declare issuer="${DOMAIN}"
 [[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
 # OIDC Discovery to resolve token endpoint (unless disabled via -D)
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
-  discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
+  discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
 
-  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
-  declare d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+  declare d_token
+  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare d_issuer
+  d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
 
   [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
 fi
 
 declare secret=''
-[[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\": \"${AUTH0_CLIENT_SECRET}\","
+[[ -n "${CLIENT_SECRET}" ]] && secret="\"client_secret\": \"${CLIENT_SECRET}\","
 
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
-  readonly client_assertion=$(cat <<EOL
+  assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  readonly assertion
+  client_assertion=$(cat <<EOL
   , "client_assertion" : "${assertion}",
   "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 EOL
   )
+  readonly client_assertion
   echo "client_assertion: ${client_assertion}"
 fi
 
-declare BODY=$(cat <<EOL
+declare BODY
+BODY=$(cat <<EOL
 {
             "grant_type": "http://auth0.com/oauth/grant-type/password-realm",
-            "realm" : "${AUTH0_CONNECTION}",
-            "client_id": "${AUTH0_CLIENT_ID}", ${secret}
-            "scope": "${AUTH0_SCOPE}",
-            "audience": "${AUTH0_AUDIENCE}",
+            "realm" : "${CONNECTION}",
+            "client_id": "${CLIENT_ID}", ${secret}
+            "scope": "${SCOPE}",
+            "audience": "${AUDIENCE}",
             "username": "${username}",
             "password": "${password}"
             ${client_assertion}
@@ -159,6 +167,11 @@ EOL
 
 # --header "$ff_prefix-forwarded-for: ${origin_ip}" \
 # --header "true-client-ip: 20.30.40.50" \
+
+if [[ -n "${opt_verbose}" ]]; then
+  echo >&2 "> POST ${token_endpoint}"
+  echo "${BODY}" | jq . >&2
+fi
 
 if [[ -z "${cname_api_key}"  ]]; then
   curl -s -k --header 'content-type: application/json' -d "${BODY}" --url "${token_endpoint}" | jq .
