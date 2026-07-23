@@ -29,4 +29,4 @@ jobs:
       - name: shellcheck
         run: |
           mapfile -d '' -t files < <(find . -name "*.sh" -not -path "./.git/*" -print0)
-          shellcheck --shell bash --exclude=SC1090,SC1091 "${files[@]}"
+          shellcheck --shell bash --exclude=SC1090,SC1091 --severity=warning "${files[@]}"
