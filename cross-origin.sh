@@ -3,8 +3,9 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
+# Auth0-specific: targets Auth0's legacy /co/authenticate cross-origin endpoint.
 
 set -eo pipefail
 
@@ -22,30 +23,30 @@ urlencode() {
     done
 }
 
-declare AUTH0_REDIRECT_URI='https://jwt.io' # add this to "Allowed Callback URLs" of your application
-declare AUTH0_ORIGIN='https://jwt.io'       # add this to "Allowed Web Origins" of your application
-declare AUTH0_CONNECTION='Username-Password-Authentication'
-declare AUTH0_SCOPE='openid profile email'
+declare REDIRECT_URI='https://jwt.io' # add this to "Allowed Callback URLs" of your application
+declare ORIGIN='https://jwt.io'       # add this to "Allowed Web Origins" of your application
+declare CONNECTION='Username-Password-Authentication'
+declare SCOPE='openid profile email'
 
-declare -r AUTH0_CLIENT='{"name":"auth0.js","version":"9.0.2"}'
-declare -r AUTH0_CLIENT_B64=$(echo -n $AUTH0_CLIENT | base64)
+declare -r CLIENT_META='{"name":"auth0.js","version":"9.0.2"}'
+declare -r CLIENT_META_B64=$(echo -n $CLIENT_META | base64)
 
 function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p password] [-r connection] [-o origin] [-U callback] [-v|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
-        -c client_id   # Auth0 client ID
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain
+        -c client_id   # OAuth2/OIDC client ID
         -u username    # Username
         -p password    # Password
-        -r realm       # Connection (default ${AUTH0_CONNECTION})
-        -o origin      # Allowed Origin (default ${AUTH0_ORIGIN})
-        -U callback    # callback URL (default ${AUTH0_REDIRECT_URI})
+        -r realm       # Connection (default ${CONNECTION})
+        -o origin      # Allowed Origin (default ${ORIGIN})
+        -U callback    # callback URL (default ${REDIRECT_URI})
         -a audience    # audience
         -S state       # state
         -n nonce       # nonce
-        -s scopes      # scopes (comma-separated, default "${AUTH0_SCOPE}")
+        -s scopes      # scopes (comma-separated, default "${SCOPE}")
         -M             # Management API audience
         -h|?           # usage
         -v             # verbose
@@ -56,9 +57,9 @@ END
     exit $1
 }
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_AUDIENCE=''
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare AUDIENCE=''
 declare USERNAME=''
 declare PASSWORD=''
 declare opt_mgmnt=''
@@ -70,17 +71,17 @@ declare opt_nonce=''
 
 while getopts "e:t:d:c:a:u:p:r:o:U:s:S:n:Mhv?" opt; do
     case ${opt} in
-    e) source ${OPTARG} ;;
-    t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
-    d) AUTH0_DOMAIN=${OPTARG} ;;
-    c) AUTH0_CLIENT_ID=${OPTARG} ;;
-    a) AUTH0_AUDIENCE=${OPTARG} ;;
+    e) source "${OPTARG}" ;;
+    t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
+    d) DOMAIN=${OPTARG} ;;
+    c) CLIENT_ID=${OPTARG} ;;
+    a) AUDIENCE=${OPTARG} ;;
     u) USERNAME=${OPTARG} ;;
     p) PASSWORD=${OPTARG} ;;
-    r) AUTH0_CONNECTION=${OPTARG} ;;
-    o) AUTH0_ORIGIN=${OPTARG} ;;
-    U) AUTH0_REDIRECT_URI=${OPTARG} ;;
-    s) AUTH0_SCOPE=$(echo ${OPTARG} | tr ',' ' ') ;;
+    r) CONNECTION=${OPTARG} ;;
+    o) ORIGIN=${OPTARG} ;;
+    U) REDIRECT_URI=${OPTARG} ;;
+    s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     S) opt_state=${OPTARG} ;;
     n) opt_nonce=${OPTARG} ;;
     M) opt_mgmnt=1 ;;
@@ -90,31 +91,31 @@ while getopts "e:t:d:c:a:u:p:r:o:U:s:S:n:Mhv?" opt; do
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
+[[ -z "${DOMAIN}" ]] && {  echo >&2 "ERROR: DOMAIN undefined";  usage 1;  }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined";  usage 1; }
 
 [[ -z "${USERNAME}" ]] && { echo >&2 "ERROR: USERNAME undefined";  usage 1; }
 
 [[ -z "${PASSWORD}" ]] && { echo >&2 "ERROR: PASSWORD undefined";  usage 1; }
 
 
-[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="https://${AUTH0_DOMAIN}/api/v2/"
+[[ -n "${opt_mgmnt}" ]] && AUDIENCE="https://${DOMAIN}/api/v2/"
 
 declare BODY=$(cat <<EOL
 {
-    "client_id":"${AUTH0_CLIENT_ID}",
+    "client_id":"${CLIENT_ID}",
     "username":"${USERNAME}",
     "password":"${PASSWORD}",
-    "realm":"${AUTH0_CONNECTION}",
+    "realm":"${CONNECTION}",
     "credential_type":"http://auth0.com/oauth/grant-type/password-realm"
 }
 EOL
 )
 
 declare co_response=$(curl -s -c cookie.txt -H "Content-Type: application/json" \
-    -H "origin: ${AUTH0_ORIGIN}" \
-    -H "auth0-clients: ${AUTH0_CLIENT_B64}" \
-    -d "${BODY}" https://${AUTH0_DOMAIN}/co/authenticate)
+    -H "origin: ${ORIGIN}" \
+    -H "auth0-clients: ${CLIENT_META_B64}" \
+    -d "${BODY}" https://${DOMAIN}/co/authenticate)
 
 echo "CO Response: ${co_response}"
 
@@ -124,11 +125,11 @@ echo "login_ticket=${login_ticket}"
 
 [[ ${login_ticket} == "null" ]] && { echo >&2 "login_ticket collection failed"; exit 3; }
 
-declare authorize_url="https://${AUTH0_DOMAIN}/authorize?client_id=${AUTH0_CLIENT_ID}&response_type=$(urlencode "token id_token")&redirect_uri=$(urlencode ${AUTH0_REDIRECT_URI})&login_ticket=${login_ticket}&nonce=n1" # &auth0Client=${AUTH0_CLIENT_B64}
+declare authorize_url="https://${DOMAIN}/authorize?client_id=${CLIENT_ID}&response_type=$(urlencode "token id_token")&redirect_uri=$(urlencode ${REDIRECT_URI})&login_ticket=${login_ticket}&nonce=n1" # &auth0Client=${CLIENT_META_B64}
 
-[[ -n "${AUTH0_AUDIENCE}" ]] && authorize_url+="&audience=$(urlencode ${AUTH0_AUDIENCE})"
-[[ -n "${AUTH0_CONNECTION}" ]] && authorize_url+="&connection=${AUTH0_CONNECTION}"
-[[ -n "${AUTH0_SCOPE}" ]] && authorize_url+="&scope=$(urlencode "${AUTH0_SCOPE}")"
+[[ -n "${AUDIENCE}" ]] && authorize_url+="&audience=$(urlencode ${AUDIENCE})"
+[[ -n "${CONNECTION}" ]] && authorize_url+="&connection=${CONNECTION}"
+[[ -n "${SCOPE}" ]] && authorize_url+="&scope=$(urlencode "${SCOPE}")"
 [[ -n "${opt_state}" ]] && authorize_url+="&state=$(urlencode ${opt_state})"
 [[ -n "${opt_nonce}" ]] && authorize_url+="&nonce=$(urlencode ${opt_nonce})"
 

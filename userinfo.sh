@@ -10,8 +10,8 @@ function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-a access_token] [-v|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region (for opaque tokens)
-        -d domain      # Auth0 domain (for opaque tokens)
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com) (for opaque tokens)
+        -d domain      # OIDC provider domain (for opaque tokens)
         -a token       # Access Token (default is access_token env variable)
         -h|?           # usage
         -v             # verbose
@@ -22,15 +22,15 @@ END
     exit $1
 }
 
-declare AUTH0_DOMAIN=''
+declare DOMAIN=''
 
 declare opt_verbose=0
 
 while getopts "e:t:d:a:hv?" opt; do
     case ${opt} in
-    e) source ${OPTARG} ;;
-    t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
-    d) AUTH0_DOMAIN=${OPTARG} ;;
+    e) source "${OPTARG}" ;;
+    t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
+    d) DOMAIN=${OPTARG} ;;
     a) access_token=${OPTARG} ;;
     v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
@@ -40,12 +40,12 @@ done
 
 [[ -z "${access_token}" ]] && { echo >&2 "ERROR: access_token undefined. export access_token='PASTE' ";  usage 1; }
 
-declare -r AUTH0_DOMAIN_URL=$(jq -Rr 'split(".")[1] | gsub("-";"+") | gsub("_";"/") | gsub("%3D";"=") | @base64d | fromjson | .iss // empty' <<< "${access_token}")
+declare -r DOMAIN_URL=$(jq -Rr 'split(".")[1] | gsub("-";"+") | gsub("_";"/") | gsub("%3D";"=") | @base64d | fromjson | .iss // empty' <<< "${access_token}")
 
-if [[ -z "${AUTH0_DOMAIN_URL}" ]]; then
-  [[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
-  [[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
-  AUTH0_DOMAIN_URL="${AUTH0_DOMAIN}/"
+if [[ -z "${DOMAIN_URL}" ]]; then
+  [[ -z "${DOMAIN}" ]] && {  echo >&2 "ERROR: DOMAIN undefined";  usage 1;  }
+  [[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
+  DOMAIN_URL="${DOMAIN}/"
 fi
 
-curl -s -H "Authorization: Bearer ${access_token}" "${AUTH0_DOMAIN_URL}userinfo" | jq '.'
+curl -s -H "Authorization: Bearer ${access_token}" "${DOMAIN_URL}userinfo" | jq '.'

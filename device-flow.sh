@@ -14,9 +14,9 @@ function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-s scopes] [-a audience] [-M|-v|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
-        -c client_id   # Auth0 client ID
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain
+        -c client_id   # OAuth2/OIDC client ID
         -s scopes      # scope1,scope2,etc
         -a audience    # API audience
         -M             # Management API audience
@@ -29,10 +29,10 @@ END
     exit $1
 }
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_CLIENT_SECRET=''
-declare AUTH0_AUDIENCE=''
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare CLIENT_SECRET=''
+declare AUDIENCE=''
 
 declare opt_verbose=0
 declare opt_mgmnt=''
@@ -42,10 +42,10 @@ declare scopes_field=''
 
 while getopts "e:t:d:c:a:s:Mhv?" opt; do
     case ${opt} in
-    e) source ${OPTARG} ;;
-    t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
-    d) AUTH0_DOMAIN=${OPTARG} ;;
-    c) AUTH0_CLIENT_ID=${OPTARG} ;;
+    e) source "${OPTARG}" ;;
+    t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
+    d) DOMAIN=${OPTARG} ;;
+    c) CLIENT_ID=${OPTARG} ;;
     s)
         scopes=$(echo ${OPTARG} | tr , ' ')
         scopes_field=",\"scope\":\"${scopes}\""
@@ -58,21 +58,21 @@ while getopts "e:t:d:c:a:s:Mhv?" opt; do
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && {  echo >&2 "ERROR: AUTH0_DOMAIN undefined";  usage 1;  }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined";  usage 1; }
+[[ -z "${DOMAIN}" ]] && {  echo >&2 "ERROR: DOMAIN undefined";  usage 1;  }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined";  usage 1; }
 
 
-[[ -n "${opt_mgmnt}" ]] && audience_field=",\"audience\":\"https://${AUTH0_DOMAIN}/api/v2/\""
+[[ -n "${opt_mgmnt}" ]] && audience_field=",\"audience\":\"https://${DOMAIN}/api/v2/\""
 
 declare BODY=$(cat <<EOL
 {
-    "client_id":"${AUTH0_CLIENT_ID}"
+    "client_id":"${CLIENT_ID}"
     ${audience_field}
     ${scopes_field}
 }
 EOL
 )
 
-curl -ss --header 'content-type: application/json' -d "${BODY}" https://${AUTH0_DOMAIN}/oauth/device/code | jq .
+curl -ss --header 'content-type: application/json' -d "${BODY}" https://${DOMAIN}/oauth/device/code | jq .
 
-echo -e "\n Polling:\n ./exchange.sh -d ${AUTH0_DOMAIN} -c ${AUTH0_CLIENT_ID} -D DEVICE_CODE"
+echo -e "\n Polling:\n ./exchange.sh -d ${DOMAIN} -c ${CLIENT_ID} -D DEVICE_CODE"

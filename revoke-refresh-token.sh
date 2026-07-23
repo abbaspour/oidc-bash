@@ -11,10 +11,10 @@ function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-r refresh_token]  [-v|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
-        -c client_id   # Auth0 client ID
-        -x secret      # Auth0 client secret (optional for public clients)
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain
+        -c client_id   # OAuth2/OIDC client ID
+        -x secret      # OAuth2/OIDC client secret (optional for public clients)
         -r token       # refresh_token
         -h|?           # usage
         -v             # verbose
@@ -25,9 +25,9 @@ END
     exit $1
 }
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_CLIENT_SECRET=''
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare CLIENT_SECRET=''
 declare opt_verbose=0
 declare refresh_token=''
 
@@ -35,10 +35,10 @@ while getopts "e:t:d:c:r:x:hv?" opt
 do
     case ${opt} in
         e) source "${OPTARG}";;
-        t) AUTH0_DOMAIN=$(echo "${OPTARG}".auth0.com | tr '@' '.');;
-        d) AUTH0_DOMAIN=${OPTARG};;
-        c) AUTH0_CLIENT_ID=${OPTARG};;
-        x) AUTH0_CLIENT_SECRET=${OPTARG};;
+        t) DOMAIN=$(echo "${OPTARG}".auth0.com | tr '@' '.');;
+        d) DOMAIN=${OPTARG};;
+        c) CLIENT_ID=${OPTARG};;
+        x) CLIENT_SECRET=${OPTARG};;
         r) refresh_token=${OPTARG};;
         v) opt_verbose=1;; #set -x;;
         h|?) usage 0;;
@@ -46,16 +46,16 @@ do
     esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && { echo >&2 "ERROR: AUTH0_DOMAIN undefined"; usage 1; }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined"; usage 1; }
+[[ -z "${DOMAIN}" ]] && { echo >&2 "ERROR: DOMAIN undefined"; usage 1; }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined"; usage 1; }
 [[ -z "${refresh_token}" ]] && { echo >&2 "ERROR: refresh_token undefined"; usage 1; }
 
 declare secret=''
-[[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${AUTH0_CLIENT_SECRET}\","
+[[ -n "${CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${CLIENT_SECRET}\","
 
 declare BODY=$(cat <<EOL
 {
-    "client_id":"${AUTH0_CLIENT_ID}",
+    "client_id":"${CLIENT_ID}",
     ${secret}
     "token": "${refresh_token}"
 }
@@ -63,7 +63,7 @@ EOL
 )
 
 curl --request POST \
-  --url "https://${AUTH0_DOMAIN}/oauth/revoke" \
+  --url "https://${DOMAIN}/oauth/revoke" \
   --header 'content-type: application/json' \
   --data "${BODY}"
 

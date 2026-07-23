@@ -16,10 +16,10 @@ function usage() {
   cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a audience] [-M|-O|-v|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain or edge location
-        -c client_id   # Auth0 client ID
-        -x secret      # Auth0 client secret
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain or edge location
+        -c client_id   # OAuth2/OIDC client ID
+        -x secret      # OAuth2/OIDC client secret
         -a audience    # API audience
         -o org_id      # Organization ID
         -k kid         # client public key jwt id
@@ -38,11 +38,11 @@ END
   exit $1
 }
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_CLIENT_SECRET=''
-declare AUTH0_AUDIENCE=''
-declare AUTH0_ORGANIZATION=''
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare CLIENT_SECRET=''
+declare AUDIENCE=''
+declare ORGANIZATION=''
 declare secret=''
 declare organization=''
 declare kid=''
@@ -60,12 +60,12 @@ declare opt_verbose=''
 while getopts "e:t:d:c:a:o:x:k:K:n:C:OSMhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
-  t) AUTH0_DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
-  d) AUTH0_DOMAIN=${OPTARG} ;;
-  c) AUTH0_CLIENT_ID=${OPTARG} ;;
-  x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
-  a) AUTH0_AUDIENCE=${OPTARG} ;;
-  o) AUTH0_ORGANIZATION=${OPTARG} ;;
+  t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
+  d) DOMAIN=${OPTARG} ;;
+  c) CLIENT_ID=${OPTARG} ;;
+  x) CLIENT_SECRET=${OPTARG} ;;
+  a) AUDIENCE=${OPTARG} ;;
+  o) ORGANIZATION=${OPTARG} ;;
   k) kid=${OPTARG} ;;
   K) private_pem=${OPTARG} ;;
   n) cname_api_key=${OPTARG} ;;
@@ -79,20 +79,20 @@ while getopts "e:t:d:c:a:o:x:k:K:n:C:OSMhv?" opt; do
   esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && { echo >&2 "ERROR: AUTH0_DOMAIN undefined"; usage 1; }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined"; usage 1; }
+[[ -z "${DOMAIN}" ]] && { echo >&2 "ERROR: DOMAIN undefined"; usage 1; }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined"; usage 1; }
 
-[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
-[[ ${AUTH0_DOMAIN} =~ /$ ]] || AUTH0_DOMAIN="${AUTH0_DOMAIN}/"
+[[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
+[[ ${DOMAIN} =~ /$ ]] || DOMAIN="${DOMAIN}/"
 
-[[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${AUTH0_CLIENT_SECRET}\","
-[[ -n "${AUTH0_ORGANIZATION}" ]] && organization="\"organization\":\"${AUTH0_ORGANIZATION}\","
+[[ -n "${CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${CLIENT_SECRET}\","
+[[ -n "${ORGANIZATION}" ]] && organization="\"organization\":\"${ORGANIZATION}\","
 
-[[ -n "${opt_mgmnt}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}api/v2/"
-[[ -n "${opt_myorg}" ]] && AUTH0_AUDIENCE="${AUTH0_DOMAIN}my-org/"
+[[ -n "${opt_mgmnt}" ]] && AUDIENCE="${DOMAIN}api/v2/"
+[[ -n "${opt_myorg}" ]] && AUDIENCE="${DOMAIN}my-org/"
 
 if [[ -n "${private_pem}" ]]; then
-  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${AUTH0_DOMAIN}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${DOMAIN}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}")
   client_assertion=$(
     cat <<EOL
   , "client_assertion" : "${assertion}",
@@ -103,21 +103,21 @@ fi
 
 readonly BODY=$(cat <<EOL
 {
-    "client_id":"${AUTH0_CLIENT_ID}", ${secret}
-    "audience":"${AUTH0_AUDIENCE}", ${organization}
+    "client_id":"${CLIENT_ID}", ${secret}
+    "audience":"${AUDIENCE}", ${organization}
     "grant_type":"client_credentials" ${client_assertion}
 }
 EOL
 )
 
 if [[ -z "${cname_api_key}"  ]]; then
-  curl -s -k --header 'content-type: application/json' -d "${BODY}" "${AUTH0_DOMAIN}oauth/token" | jq .
+  curl -s -k --header 'content-type: application/json' -d "${BODY}" "${DOMAIN}oauth/token" | jq .
 else
   curl -s -k --header 'content-type: application/json' -d "${BODY}" \
     --header "cname-api-key: ${cname_api_key}" \
     --header "client-certificate: ${client_certificate}" \
     --header "client-certificate-ca-verified: ${ca_signed}" \
-    "${AUTH0_DOMAIN}oauth/token" | jq .
+    "${DOMAIN}oauth/token" | jq .
 fi
 
 echo

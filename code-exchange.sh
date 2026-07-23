@@ -17,10 +17,10 @@ function usage() {
   cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X code_verifier] [-P dpop.pem] [-u callback] [-a authorization_code] [-p] [-D] [-v|-h]
         -e file        # .env file location (default cwd)
-        -t tenant      # Auth0 tenant@region
-        -d domain      # Auth0 domain
-        -c client_id   # Auth0 client ID
-        -x secret      # Auth0 client secret
+        -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
+        -d domain      # OIDC provider domain
+        -c client_id   # OAuth2/OIDC client ID
+        -x secret      # OAuth2/OIDC client secret
         -X verifier    # PKCE code_verifier
         -a code        # Authorization Code to exchange
         -r req_id      # back channel authorization (CIBA) auth_req_id
@@ -43,10 +43,10 @@ END
   exit $1
 }
 
-declare AUTH0_DOMAIN=''
-declare AUTH0_CLIENT_ID=''
-declare AUTH0_CLIENT_SECRET=''
-declare AUTH0_REDIRECT_URI='https://jwt.io'
+declare DOMAIN=''
+declare CLIENT_ID=''
+declare CLIENT_SECRET=''
+declare REDIRECT_URI='https://jwt.io'
 declare authorization_code=''
 declare code_verifier=''
 declare grant_type='authorization_code'
@@ -67,11 +67,11 @@ declare content_type='application/json'
 while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:Dbphv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
-  t) AUTH0_DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
-  d) AUTH0_DOMAIN=${OPTARG} ;;
-  c) AUTH0_CLIENT_ID=${OPTARG} ;;
-  x) AUTH0_CLIENT_SECRET=${OPTARG} ;;
-  u) AUTH0_REDIRECT_URI=${OPTARG} ;;
+  t) DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
+  d) DOMAIN=${OPTARG} ;;
+  c) CLIENT_ID=${OPTARG} ;;
+  x) CLIENT_SECRET=${OPTARG} ;;
+  u) REDIRECT_URI=${OPTARG} ;;
   a) authorization_code=${OPTARG} ;;
   X) code_verifier=${OPTARG} ;;
   P) dpop_pem_file=${OPTARG} ;;
@@ -90,15 +90,15 @@ while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:Dbphv?" opt; do
   esac
 done
 
-[[ -z "${AUTH0_DOMAIN}" ]] && { echo >&2 "ERROR: AUTH0_DOMAIN undefined"; usage 1; }
-[[ -z "${AUTH0_CLIENT_ID}" ]] && { echo >&2 "ERROR: AUTH0_CLIENT_ID undefined"; usage 1; }
-[[ -z "${AUTH0_REDIRECT_URI}" ]] && { echo >&2 "ERROR: AUTH0_REDIRECT_URI undefined"; usage 1; }
+[[ -z "${DOMAIN}" ]] && { echo >&2 "ERROR: DOMAIN undefined"; usage 1; }
+[[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined"; usage 1; }
+[[ -z "${REDIRECT_URI}" ]] && { echo >&2 "ERROR: REDIRECT_URI undefined"; usage 1; }
 [[ -z "${authorization_code}" ]] && { echo >&2 "ERROR: authorization_code undefined"; usage 1; }
 
-[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+[[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
 
-declare token_endpoint="${AUTH0_DOMAIN}/${token_endpoint_path}"
-declare issuer="${AUTH0_DOMAIN}"
+declare token_endpoint="${DOMAIN}/${token_endpoint_path}"
+declare issuer="${DOMAIN}"
 [[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
 declare secret=''
@@ -110,7 +110,7 @@ declare assertion=''
 # OIDC Discovery to resolve token endpoint (unless disabled via -D)
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
-  discovery_json=$(curl -s -k --header "accept: application/json" --url "${AUTH0_DOMAIN}/.well-known/openid-configuration" || true)
+  discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
 
   declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
   declare d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
@@ -121,14 +121,14 @@ fi
 
 if [[ ${http_basic} -eq 1 ]]; then
   authorization_header="Authorization: Basic "
-  authorization_header+=$(printf "%s:%s" "${AUTH0_CLIENT_ID}" "${AUTH0_CLIENT_SECRET}" | openssl base64 -e -A)
+  authorization_header+=$(printf "%s:%s" "${CLIENT_ID}" "${CLIENT_SECRET}" | openssl base64 -e -A)
 else
-  [[ -n "${AUTH0_CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${AUTH0_CLIENT_SECRET}\","
+  [[ -n "${CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${CLIENT_SECRET}\","
   [[ -n "${code_verifier}" ]] && secret+="\"code_verifier\":\"${code_verifier}\","
 fi
 
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${AUTH0_CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
+  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
   readonly client_assertion=$(cat <<EOL
     , "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
     "client_assertion" : "${assertion}"
@@ -140,12 +140,12 @@ fi
 
 declare BODY=$(cat <<EOL
 {
-    "client_id":"${AUTH0_CLIENT_ID}",
+    "client_id":"${CLIENT_ID}",
     ${secret}
     "${code_type}": "${authorization_code}",
     "grant_type":"${grant_type}",
     "scope":"openid",
-    "redirect_uri": "${AUTH0_REDIRECT_URI}"
+    "redirect_uri": "${REDIRECT_URI}"
 ${client_assertion}
 }
 EOL

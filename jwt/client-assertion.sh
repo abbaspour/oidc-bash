@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: MIT (https://github.com/abbaspour/auth0-bash/blob/master/LICENSE)
+# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
 ##########################################################################################
 
 set -eo pipefail
@@ -44,7 +44,7 @@ declare opt_verbose=''
 while getopts "e:t:a:i:f:k:A:hv?" opt
 do
     case ${opt} in
-        e) source ${OPTARG};;
+        e) source "${OPTARG}";;
         a) AUDIENCE="${OPTARG}";;
         i) client_id=${OPTARG};;
         f) pem_file=${OPTARG};;
@@ -64,7 +64,7 @@ done
 [[ -z "${pem_file}" ]] && { echo >&2 "ERROR: pem_file undefined."; usage 1; }
 [[ -f "${pem_file}" ]] || { echo >&2 "ERROR: pem_file missing: ${pem_file}"; usage 1; }
 
-[[ ${AUTH0_DOMAIN} =~ ^http ]] || AUTH0_DOMAIN=https://${AUTH0_DOMAIN}
+[[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
 
 declare ALG="${alg^^}"
 
