@@ -1,0 +1,32 @@
+name: Shell Script Validation
+
+on:
+  pull_request:
+    paths:
+      - '**/*.sh'
+      - '.github/workflows/shellcheck.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: bash -n syntax check
+        run: |
+          status=0
+          while IFS= read -r -d '' f; do
+            echo "::group::bash -n $f"
+            if ! bash -n "$f"; then
+              echo "::error file=$f::syntax error"
+              status=1
+            fi
+            echo "::endgroup::"
+          done < <(find . -name "*.sh" -not -path "./.git/*" -print0)
+          exit "$status"
+
+      - name: shellcheck
+        run: |
+          mapfile -d '' -t files < <(find . -name "*.sh" -not -path "./.git/*" -print0)
+          shellcheck --shell bash --exclude=SC1090,SC1091 "${files[@]}"
