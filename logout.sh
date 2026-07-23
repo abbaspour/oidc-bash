@@ -9,7 +9,6 @@
 set -eo pipefail
 
 command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
 
 function usage() {
     cat <<END >&2

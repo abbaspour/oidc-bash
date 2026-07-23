@@ -8,7 +8,9 @@
 
 set -eo pipefail
 
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
+readonly DIR
 
 ##
 # prerequisite:

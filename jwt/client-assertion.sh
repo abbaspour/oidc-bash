@@ -8,7 +8,9 @@
 
 set -eo pipefail
 
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
+readonly DIR
 
 command -v openssl >/dev/null || { echo >&2 "error: openssl not found"; exit 3; }
 command -v sed >/dev/null || { echo >&2 "error: sed not found"; exit 3; }

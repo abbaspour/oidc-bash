@@ -2,8 +2,9 @@
 
 set -ueo pipefail
 
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
 readonly DIR
-DIR=$(dirname "${BASH_SOURCE[0]}")
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}"/.env
 

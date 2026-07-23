@@ -32,7 +32,9 @@ while getopts "p:h?" opt; do
     esac
 done
 
-cd "$(dirname "${BASH_SOURCE[0]}")"
+DIR="${BASH_SOURCE[0]%/*}"
+[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
+cd "$DIR"
 
 echo >&2 "Serving at       http://localhost:${port}/"
 echo >&2 "Callback URL:    http://localhost:${port}/cgi-bin/cb.sh"

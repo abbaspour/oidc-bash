@@ -8,8 +8,6 @@
 
 set -ueo pipefail
 
-readonly DIR=$(dirname "${BASH_SOURCE[0]}")
-
 function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-s scopes] [-a audience] [-M|-v|-h]
