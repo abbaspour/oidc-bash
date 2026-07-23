@@ -53,7 +53,7 @@ readonly header
 
 # body
 declare body
-body=$(cat "${file}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+body=$(openssl base64 -e -A < "${file}" | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
 readonly body
 
 # signature

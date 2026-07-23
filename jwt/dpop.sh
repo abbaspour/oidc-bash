@@ -80,7 +80,7 @@ PUBLIC_KEY=$(${OPENSSL_CMD} ec -in "${PRIVATE_KEY_FILE}" -pubout 2>/dev/null) ||
 # We use openssl to get the key details in a parsable format.
 # The curve name from OpenSSL needs to be mapped to the RFC JWK 'crv' name.
 # For prime256v1 (secp256r1), the crv is "P-256".
-CURVE_NAME=$(cat "${PRIVATE_KEY_FILE}" | ${OPENSSL_CMD} ec -noout -text 2>/dev/null | grep "ASN1 OID" | awk '{print $3}')
+CURVE_NAME=$(${OPENSSL_CMD} ec -noout -text < "${PRIVATE_KEY_FILE}" 2>/dev/null | grep "ASN1 OID" | awk '{print $3}')
 case ${CURVE_NAME} in
     "prime256v1")
         CRV="P-256"

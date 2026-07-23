@@ -38,8 +38,9 @@ query="${QUERY_STRING:-}"
 req_body=''
 if [[ "$method" == "POST" && "${CONTENT_TYPE:-}" == application/x-www-form-urlencoded* ]]; then
     content_length="${CONTENT_LENGTH:-0}"
-    [[ "$content_length" =~ ^[0-9]+$ && "$content_length" -gt 0 ]] && \
+    if [[ "$content_length" =~ ^[0-9]+$ && "$content_length" -gt 0 ]]; then
         IFS= read -r -N "$content_length" req_body || true
+    fi
 fi
 
 params="$query"

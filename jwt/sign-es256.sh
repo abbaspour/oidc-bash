@@ -135,7 +135,7 @@ fi
 [[ -s "$SIG_DER" ]] || { echo "ERROR: signature file empty"; exit 1; }
 
 der_to_raw_rs "$SIG_DER" > "$SIG_RAW"
-SIG_B64=$(cat "$SIG_RAW" | b64url)
+SIG_B64=$(b64url < "$SIG_RAW")
 echo "${SIGNED_INPUT}.${SIG_B64}"
 
 # cleanup
