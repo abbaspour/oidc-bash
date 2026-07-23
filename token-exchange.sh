@@ -47,7 +47,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-k
 eg,
      $0 -t amin01@au -c client_id -x client_secret -i ey... -A -a newapi -s read:things
 END
-    exit $1
+    exit "$1"
 }
 
 declare DOMAIN=''

@@ -24,7 +24,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-s scopes] [-a audien
 eg,
      $0 -t amin01@au -c aIioQEeY7nJdX78vcQWDBcAqTABgKnZl
 END
-    exit $1
+    exit "$1"
 }
 
 declare DOMAIN=''
@@ -43,7 +43,7 @@ while getopts "e:t:d:c:a:s:Mhv?" opt; do
     d) DOMAIN=${OPTARG} ;;
     c) CLIENT_ID=${OPTARG} ;;
     s)
-        scopes=$(echo ${OPTARG} | tr , ' ')
+        scopes=$(echo "${OPTARG}" | tr ',' ' ')
         scopes_field=",\"scope\":\"${scopes}\""
         ;;
     a) audience_field=",\"audience\":\"${OPTARG}\"" ;;
@@ -75,6 +75,6 @@ if [[ -n "${opt_verbose}" ]]; then
     echo "${BODY}" | jq . >&2
 fi
 
-curl -ss --header 'content-type: application/json' -d "${BODY}" https://${DOMAIN}/oauth/device/code | jq .
+curl -ss --header 'content-type: application/json' -d "${BODY}" "https://${DOMAIN}/oauth/device/code" | jq .
 
 echo -e "\n Polling:\n ./exchange.sh -d ${DOMAIN} -c ${CLIENT_ID} -D DEVICE_CODE"

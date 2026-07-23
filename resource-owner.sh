@@ -49,7 +49,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p pass
 eg,
      $0 -t amin01@au -s offline_access -c XXXX -u user -p pass
 END
-  exit $1
+  exit "$1"
 }
 
 declare DOMAIN=''
@@ -80,7 +80,7 @@ declare opt_verbose=''
 while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:K:C:DSAmMOhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
-  t) DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
+  t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
   u) username=${OPTARG} ;;
   p) password=${OPTARG} ;;
   d) DOMAIN=${OPTARG} ;;
@@ -88,7 +88,7 @@ while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:K:C:DSAmMOhv?" opt; do
   x) CLIENT_SECRET=${OPTARG} ;;
   a) AUDIENCE=${OPTARG} ;;
   r) CONNECTION=${OPTARG} ;;
-  s) SCOPE=$(echo ${OPTARG} | tr ',' ' ') ;;
+  s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
   i) origin_ip=${OPTARG} ;;
   n) cname_api_key=${OPTARG} ;;
   k) kid=${OPTARG} ;;

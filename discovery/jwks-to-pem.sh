@@ -35,7 +35,7 @@ eg,
      $0 -t amin01@au
      $0 -t amin01@au -a RS256
 END
-    exit $1
+    exit "$1"
 }
 
 declare DOMAIN=''
@@ -80,7 +80,8 @@ for k in $(echo "${jwks_json}" | jq -r '.keys[] .kid'); do
     [[ -n "${KID}" && ! "${k}" =~ ${KID} ]] && continue
 
     # Get all algorithms for this kid
-    declare key_algs=($(echo "${jwks_json}" | jq -r ".keys[] | select(.kid==\"${k}\") | .alg"))
+    declare -a key_algs
+    mapfile -t key_algs < <(echo "${jwks_json}" | jq -r ".keys[] | select(.kid==\"${k}\") | .alg")
 
     for key_alg in "${key_algs[@]}"; do
         # Skip if ALG is specified and doesn't match this key's algorithm

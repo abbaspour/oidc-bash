@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
@@ -22,7 +23,7 @@ eg,
      $0 -n backend-api
      $0 -n backend-api -e
 END
-    exit $1
+    exit "$1"
 }
 
 declare pair_name

@@ -19,7 +19,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-a access_token] [-v|-h]
 eg,
      $0 -t amin01@au -a J7REwk4c6tJo29jmMV0AZZ79vBd8_qTz
 END
-    exit $1
+    exit "$1"
 }
 
 declare DOMAIN=''

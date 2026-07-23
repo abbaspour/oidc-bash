@@ -23,7 +23,7 @@ USAGE: $0 [-e file] [-t tenant] [-d domain]
 eg,
      $0 -t amin01@au
 END
-    exit $1
+    exit "$1"
 }
 
 declare DOMAIN=''

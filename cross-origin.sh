@@ -18,9 +18,9 @@ urlencode() {
     for ((i = 0; i < length; i++)); do
         local c="${1:i:1}"
         case $c in
-        [a-zA-Z0-9.~_-]) printf "$c" ;;
+        [a-zA-Z0-9.~_-]) printf '%s' "$c" ;;
         *) printf '%s' "$c" | xxd -p -c1 |
-            while read c; do printf '%%%s' "$c"; done ;;
+            while read -r c; do printf '%%%s' "$c"; done ;;
         esac
     done
 }
@@ -57,7 +57,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p pass
 eg,
      $0 -t amin01@au -u somebody@gmail.com  -p XXXXX -c 1iSgx01LN27oEgpFfGvG2UASbpSndtXg -M
 END
-    exit $1
+    exit "$1"
 }
 
 declare DOMAIN=''
@@ -125,7 +125,7 @@ declare co_response
 co_response=$(curl -s -c cookie.txt -H "Content-Type: application/json" \
     -H "origin: ${ORIGIN}" \
     -H "auth0-clients: ${CLIENT_META_B64}" \
-    -d "${BODY}" https://${DOMAIN}/co/authenticate)
+    -d "${BODY}" "https://${DOMAIN}/co/authenticate")
 
 echo "CO Response: ${co_response}"
 
@@ -137,20 +137,20 @@ echo "login_ticket=${login_ticket}"
 [[ ${login_ticket} == "null" ]] && { echo >&2 "login_ticket collection failed"; exit 3; }
 
 declare authorize_url
-authorize_url="https://${DOMAIN}/authorize?client_id=${CLIENT_ID}&response_type=$(urlencode "token id_token")&redirect_uri=$(urlencode ${REDIRECT_URI})&login_ticket=${login_ticket}&nonce=n1" # &auth0Client=${CLIENT_META_B64}
+authorize_url="https://${DOMAIN}/authorize?client_id=${CLIENT_ID}&response_type=$(urlencode "token id_token")&redirect_uri=$(urlencode "${REDIRECT_URI}")&login_ticket=${login_ticket}&nonce=n1" # &auth0Client=${CLIENT_META_B64}
 
-[[ -n "${AUDIENCE}" ]] && authorize_url+="&audience=$(urlencode ${AUDIENCE})"
+[[ -n "${AUDIENCE}" ]] && authorize_url+="&audience=$(urlencode "${AUDIENCE}")"
 [[ -n "${CONNECTION}" ]] && authorize_url+="&connection=${CONNECTION}"
 [[ -n "${SCOPE}" ]] && authorize_url+="&scope=$(urlencode "${SCOPE}")"
-[[ -n "${opt_state}" ]] && authorize_url+="&state=$(urlencode ${opt_state})"
-[[ -n "${opt_nonce}" ]] && authorize_url+="&nonce=$(urlencode ${opt_nonce})"
+[[ -n "${opt_state}" ]] && authorize_url+="&state=$(urlencode "${opt_state}")"
+[[ -n "${opt_nonce}" ]] && authorize_url+="&nonce=$(urlencode "${opt_nonce}")"
 
 echo "authorize_url: ${authorize_url}"
 
 [[ -n "${opt_verbose}" ]] && echo >&2 "> GET ${authorize_url}"
 
 declare location
-location=$(curl -s -b cookie.txt $authorize_url | awk 'IGNORECASE = 1;/^location: /{print $2}')
+location=$(curl -s -b cookie.txt "$authorize_url" | awk 'IGNORECASE = 1;/^location: /{print $2}')
 
 echo "Redirect location: ${location}"
 

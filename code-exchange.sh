@@ -42,7 +42,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X
 eg,
      $0 -t amin01@au -c aIioQEeY7nJdX78vcQWDBcAqTABgKnZl -x XXXXXX -a 803131zx232
 END
-  exit $1
+  exit "$1"
 }
 
 declare DOMAIN=''
@@ -68,7 +68,7 @@ declare content_type='application/json'
 while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:Dbphv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
-  t) DOMAIN=$(echo ${OPTARG}.auth0.com | tr '@' '.') ;;
+  t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
   d) DOMAIN=${OPTARG} ;;
   c) CLIENT_ID=${OPTARG} ;;
   x) CLIENT_SECRET=${OPTARG} ;;

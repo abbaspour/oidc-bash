@@ -30,13 +30,14 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-i id_token] [-b brow
 eg,
      $0 -t amin01@au -f -o -b firefox
 END
-    exit $1
+    exit "$1"
 }
 
 declare opt_federated=0
 declare opt_rp_initiated=0
 declare id_token_hint=''
 declare logout_hint=''
+declare -a opt_browser=()
 
 while getopts "e:t:d:c:u:b:i:s:fCohv?" opt; do
     case ${opt} in
@@ -50,7 +51,7 @@ while getopts "e:t:d:c:u:b:i:s:fCohv?" opt; do
     C) opt_clipboard=1 ;;
     o) opt_open=1 ;;
     f) opt_federated=1 ;;
-    b) opt_browser="-a ${OPTARG} " ;;
+    b) opt_browser=(-a "${OPTARG}") ;;
     v) ;; #set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
@@ -83,11 +84,11 @@ else
 
   [[ ${opt_federated} -ne 0 ]] && logout_url+="federated&"
   [[ -n "${CLIENT_ID}" ]] && logout_url+="client_id=${CLIENT_ID}&"
-  [[ -n "${REDIRECT_URI}" ]] && logout_url+="returnTo=$(urlencode ${REDIRECT_URI})&"
+  [[ -n "${REDIRECT_URI}" ]] && logout_url+="returnTo=$(urlencode "${REDIRECT_URI}")&"
 fi
 
 
 echo "${logout_url}"
 
 [[ -n "${opt_clipboard}" ]] && echo "${logout_url}" | pbcopy
-[[ -n "${opt_open}" ]] && open ${opt_browser} "${logout_url}"
+[[ -n "${opt_open}" ]] && open "${opt_browser[@]}" "${logout_url}"

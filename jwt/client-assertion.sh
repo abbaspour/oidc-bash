@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
@@ -34,7 +35,7 @@ USAGE: $0 [-e env] [-a audience] [-i client_id] [-f file] [-k kid] [-A alg] [-t 
 eg,
      $0 -t abbaspour -i 6KS0YSEQwsvE9qRqtzonX8SEgJEYVzVH -k mykid -f ../ca/mydomain.local.key
 END
-    exit $1
+    exit "$1"
 }
 
 declare AUDIENCE=''

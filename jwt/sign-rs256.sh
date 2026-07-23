@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
@@ -29,7 +30,7 @@ USAGE: $0 [-f json] [-i iss] [-a aud] [-k kid] [-p private-key] [-v|-h]
 eg,
      $0 -f file.json -a http://my.api -i http://some.issuer -k 1 -p ../ca/myapi-private.pem
 END
-    exit $1
+    exit "$1"
 }
 
 b64url(){ openssl base64 -A | tr '+/' '-_' | tr -d '='; }

@@ -74,7 +74,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
 eg,
      $0 -t amin01@au -s offline_access -o
 END
-    exit $1
+    exit "$1"
 }
 
 urlencode() {
@@ -264,7 +264,7 @@ fi
 
 
 # shellcheck disable=SC2155
-declare authorize_params="client_id=${CLIENT_ID}&${response_param}&nonce=$(urlencode ${opt_nonce})&redirect_uri=$(urlencode ${REDIRECT_URI})&scope=$(urlencode "${SCOPE}")"
+declare authorize_params="client_id=${CLIENT_ID}&${response_param}&nonce=$(urlencode "${opt_nonce}")&redirect_uri=$(urlencode "${REDIRECT_URI}")&scope=$(urlencode "${SCOPE}")"
 
 [[ -n "${AUDIENCE}" ]] && authorize_params+="&audience=$(urlencode "${AUDIENCE}")"
 [[ -n "${CONNECTION}" ]] && authorize_params+="&connection=${CONNECTION}"

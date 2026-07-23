@@ -25,7 +25,7 @@ USAGE: $0 [-e file] [-t tenant] [-d domain]
 eg,
      $0 -t amin01@au
 END
-    exit $1
+    exit "$1"
 }
 
 declare DOMAIN=''
@@ -46,4 +46,4 @@ done
 
 [[ -n "${opt_verbose}" ]] && echo >&2 "> GET https://${DOMAIN}/.well-known/openid-configuration"
 
-curl -s https://${DOMAIN}/.well-known/openid-configuration | jq '.'
+curl -s "https://${DOMAIN}/.well-known/openid-configuration" | jq '.'

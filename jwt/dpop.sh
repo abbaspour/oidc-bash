@@ -74,10 +74,7 @@ fi
 # --- Main Script Logic ---
 
 # 1. Derive Public Key from the Private Key
-PUBLIC_KEY=$(${OPENSSL_CMD} ec -in "${PRIVATE_KEY_FILE}" -pubout 2>/dev/null)
-if [ $? -ne 0 ]; then
-    fail "Failed to derive public key from the private key."
-fi
+PUBLIC_KEY=$(${OPENSSL_CMD} ec -in "${PRIVATE_KEY_FILE}" -pubout 2>/dev/null) || fail "Failed to derive public key from the private key."
 
 # 2. Extract EC key parameters (crv, x, y) to build the JWK.
 # We use openssl to get the key details in a parsable format.

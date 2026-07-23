@@ -21,7 +21,7 @@ USAGE: $0 [-p port] [-h]
 eg,
      $0 -p 8080
 END
-    exit $1
+    exit "$1"
 }
 
 while getopts "p:h?" opt; do

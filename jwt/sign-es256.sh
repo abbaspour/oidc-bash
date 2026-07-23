@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 ##########################################################################################
 # Author: Amin Abbaspour
@@ -26,14 +27,15 @@ USAGE: $0 [-f json] [-i iss] [-a aud] [-k kid] [-p private-key] [-v|-h]
 eg,
      $0 -f file.json -a http://my.api -i http://some.issuer -k 1 -p ../ca/myapi-private.pem
 END
-    exit $1
+    exit "$1"
 }
 
 b64url(){ openssl base64 -A | tr '+/' '-_' | tr -d '='; }
 
 declare -i TTL=100
+declare typ='JWT'
 
-while getopts "f:i:a:k:p:t:hv?" opt; do
+while getopts "f:i:a:k:p:t:T:hv?" opt; do
     case ${opt} in
     f) json_file=${OPTARG} ;;
     i) CLIENT_ID=${OPTARG} ;;
@@ -50,7 +52,7 @@ done
 
 [[ -z "${KID}" ]] && { echo >&2 "ERROR: KID undefined.";  usage 1; }
 
-[[ -f "${ORIG_KEY}" ]] || { echo >&2 "ERROR: ORIG_KEY missing: ${pem_file}"; usage 1; }
+[[ -f "${ORIG_KEY}" ]] || { echo >&2 "ERROR: ORIG_KEY missing: ${ORIG_KEY}"; usage 1; }
 [[ -z "${json_file}" ]] && { echo >&2 "ERROR: json_file undefined";  usage 1; }
 
 [[ ! -f "${json_file}" ]] && { echo >&2 "json_file: unable to read file: ${json_file}";  usage 1; }
@@ -107,9 +109,9 @@ fi
 
 
 if [[ -n "$KID" ]]; then
-  HEADER_JSON='{"alg":"ES256","typ":"JWT","kid":"'"$KID"'"}'
+  HEADER_JSON='{"alg":"ES256","typ":"'"$typ"'","kid":"'"$KID"'"}'
 else
-  HEADER_JSON='{"alg":"ES256","typ":"JWT"}'
+  HEADER_JSON='{"alg":"ES256","typ":"'"$typ"'"}'
 fi
 
 declare PAYLOAD_JSON

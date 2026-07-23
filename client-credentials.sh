@@ -37,7 +37,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a
 eg,
      $0 -t amin01@au -c aIioQEeY7nJdX78vcQWDBcAqTABgKnZl -x XXXXXX -M
 END
-  exit $1
+  exit "$1"
 }
 
 declare DOMAIN=''
