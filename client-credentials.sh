@@ -112,6 +112,11 @@ readonly BODY=$(cat <<EOL
 EOL
 )
 
+if [[ -n "${opt_verbose}" ]]; then
+  echo >&2 "> POST ${DOMAIN}oauth/token"
+  echo "${BODY}" | jq . >&2
+fi
+
 if [[ -z "${cname_api_key}"  ]]; then
   curl -s -k --header 'content-type: application/json' -d "${BODY}" "${DOMAIN}oauth/token" | jq .
 else

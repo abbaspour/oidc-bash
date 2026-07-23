@@ -48,4 +48,6 @@ if [[ -z "${DOMAIN_URL}" ]]; then
   DOMAIN_URL="${DOMAIN}/"
 fi
 
+[[ -n "${opt_verbose}" ]] && echo >&2 "> GET ${DOMAIN_URL}userinfo"
+
 curl -s -H "Authorization: Bearer ${access_token}" "${DOMAIN_URL}userinfo" | jq '.'

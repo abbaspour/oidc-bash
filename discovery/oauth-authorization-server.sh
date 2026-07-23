@@ -44,4 +44,6 @@ done
 
 [[ -z "${DOMAIN}" ]] && {  echo >&2 "ERROR: DOMAIN undefined";  usage 1;  }
 
+[[ -n "${opt_verbose}" ]] && echo >&2 "> GET https://${DOMAIN}/.well-known/oauth-authorization-server"
+
 curl -s https://${DOMAIN}/.well-known/oauth-authorization-server | jq '.'

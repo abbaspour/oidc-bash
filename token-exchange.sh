@@ -187,7 +187,10 @@ BODY=$(jq -n \
      client_assertion_type: $client_assertion_type
    } | with_entries(select(.value != ""))')
 
-[[ -n "${opt_verbose}" ]] && echo "$BODY" | jq .
+if [[ -n "${opt_verbose}" ]]; then
+  echo >&2 "> POST ${token_endpoint}"
+  echo "$BODY" | jq . >&2
+fi
 
 if [[ ${form_post} -eq 1 ]]; then
   BODY=$(echo "${BODY}" | jq -r 'to_entries | map("\(.key)=\(.value|tostring|@uri)") | join("&")')

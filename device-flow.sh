@@ -71,6 +71,11 @@ declare BODY=$(cat <<EOL
 EOL
 )
 
+if [[ -n "${opt_verbose}" ]]; then
+    echo >&2 "> POST https://${DOMAIN}/oauth/device/code"
+    echo "${BODY}" | jq . >&2
+fi
+
 curl -ss --header 'content-type: application/json' -d "${BODY}" https://${DOMAIN}/oauth/device/code | jq .
 
 echo -e "\n Polling:\n ./exchange.sh -d ${DOMAIN} -c ${CLIENT_ID} -D DEVICE_CODE"

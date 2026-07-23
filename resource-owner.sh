@@ -162,6 +162,11 @@ EOL
 # --header "$ff_prefix-forwarded-for: ${origin_ip}" \
 # --header "true-client-ip: 20.30.40.50" \
 
+if [[ -n "${opt_verbose}" ]]; then
+  echo >&2 "> POST ${token_endpoint}"
+  echo "${BODY}" | jq . >&2
+fi
+
 if [[ -z "${cname_api_key}"  ]]; then
   curl -s -k --header 'content-type: application/json' -d "${BODY}" --url "${token_endpoint}" | jq .
 else

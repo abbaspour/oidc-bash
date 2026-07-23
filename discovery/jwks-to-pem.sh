@@ -44,6 +44,7 @@ declare jwks_url=''
 declare KID=''
 declare ALG=''
 declare KTY=''
+declare opt_verbose=0
 
 while getopts "e:t:d:f:u:k:a:y:Dhv?" opt; do
     case ${opt} in
@@ -56,7 +57,7 @@ while getopts "e:t:d:f:u:k:a:y:Dhv?" opt; do
     a) ALG=${OPTARG} ;;
     y) KTY=${OPTARG} ;;
     D) opt_dump=1 ;;
-    v) set -x ;;
+    v) opt_verbose=1 ;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
     esac
@@ -64,10 +65,13 @@ done
 
 if [[ -z "${jwks_url}" ]]; then
     [[ -z "${DOMAIN}" ]] && { echo >&2 "ERROR: DOMAIN undefined"; usage 1; }
+    [[ -n "${opt_verbose}" ]] && echo >&2 "> GET https://${DOMAIN}/.well-known/openid-configuration"
     jwks_url=$(curl -s "https://${DOMAIN}/.well-known/openid-configuration" | jq -r '.jwks_uri')
 else
     DOMAIN='generic'
 fi
+
+[[ -n "${opt_verbose}" ]] && echo >&2 "> GET ${jwks_url}"
 
 declare jwks_json=$(curl -s "${jwks_url}")
 

@@ -63,6 +63,11 @@ declare BODY=$(cat <<EOL
 EOL
 )
 
+if [[ -n "${opt_verbose}" ]]; then
+    echo >&2 "> POST https://${DOMAIN}/oauth/revoke"
+    echo >&2 "${BODY}"
+fi
+
 curl --request POST \
   --url "https://${DOMAIN}/oauth/revoke" \
   --header 'content-type: application/json' \

@@ -114,6 +114,11 @@ declare BODY=$(cat <<EOL
 EOL
 )
 
+if [[ -n "${opt_verbose}" ]]; then
+    echo >&2 "> POST https://${DOMAIN}/co/authenticate"
+    echo "${BODY}" | jq . >&2
+fi
+
 declare co_response=$(curl -s -c cookie.txt -H "Content-Type: application/json" \
     -H "origin: ${ORIGIN}" \
     -H "auth0-clients: ${CLIENT_META_B64}" \
@@ -136,6 +141,8 @@ declare authorize_url="https://${DOMAIN}/authorize?client_id=${CLIENT_ID}&respon
 [[ -n "${opt_nonce}" ]] && authorize_url+="&nonce=$(urlencode ${opt_nonce})"
 
 echo "authorize_url: ${authorize_url}"
+
+[[ -n "${opt_verbose}" ]] && echo >&2 "> GET ${authorize_url}"
 
 declare location=$(curl -s -b cookie.txt $authorize_url | awk 'IGNORECASE = 1;/^location: /{print $2}')
 

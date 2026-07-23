@@ -316,6 +316,8 @@ fi
 if [[ ${opt_par} -ne 0 ]]; then                       # PAR
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
+  [[ -n "${opt_verbose}" ]] && echo >&2 "> POST ${par_endpoint} ${authorize_params}"
+
   #  --tlsv1.2 --cert transport.pem --key transport.key --cacert connectid-sandbox-ca.pem
   #  --header "x-fapi-interaction-id: $(random32)" \
   declare -r request_uri=$("${CURL}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
@@ -328,6 +330,8 @@ elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
   authorize_params+="&binding_message=$(urlencode "${opt_binding_message}")"
 
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
+
+  [[ -n "${opt_verbose}" ]] && echo >&2 "> POST ${bc_authorization_endpoint} ${authorize_params}"
 
   declare -r auth_req_id=$("${CURL}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
     -d "${authorize_params}" | jq -r '.auth_req_id')
