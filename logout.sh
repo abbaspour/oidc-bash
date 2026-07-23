@@ -10,6 +10,10 @@ set -eo pipefail
 
 command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
+urlencode() {
+    jq -rn --arg x "${1}" '$x|@uri'
+}
+
 function usage() {
     cat <<END >&2
 USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-i id_token] [-b browser] [-f|-C|-o|-h]

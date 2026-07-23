@@ -80,8 +80,20 @@ header=$(
 readonly header
 
 # body
+declare body_json
+body_json=$(
+  jq -c \
+    --arg iss "${iss}" \
+    --arg aud "${aud}" \
+    '
+    . + ( if ($iss | length) > 0 then { iss: $iss } else {} end )
+      + ( if ($aud | length) > 0 then { aud: $aud } else {} end )
+    ' "${json_file}"
+)
+readonly body_json
+
 declare body
-body=$(cat "${json_file}" | b64url)
+body=$(echo -n "${body_json}" | b64url)
 readonly body
 
 declare alg_lower
