@@ -52,7 +52,6 @@ declare REDIRECT_URI='https://jwt.io'
 declare authorization_code=''
 declare code_verifier=''
 declare grant_type='authorization_code'
-declare auth_req_id=''
 declare http_basic=0
 declare form_post=0
 declare kid=''

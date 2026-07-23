@@ -29,8 +29,6 @@ END
 
 declare DOMAIN=''
 declare CLIENT_ID=''
-declare CLIENT_SECRET=''
-declare AUDIENCE=''
 
 declare opt_verbose=0
 declare opt_mgmnt=''

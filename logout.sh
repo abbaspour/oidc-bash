@@ -37,7 +37,6 @@ declare opt_federated=0
 declare opt_rp_initiated=0
 declare id_token_hint=''
 declare logout_hint=''
-declare opt_verbose=''
 
 while getopts "e:t:d:c:u:b:i:s:fCohv?" opt; do
     case ${opt} in
@@ -52,7 +51,7 @@ while getopts "e:t:d:c:u:b:i:s:fCohv?" opt; do
     o) opt_open=1 ;;
     f) opt_federated=1 ;;
     b) opt_browser="-a ${OPTARG} " ;;
-    v) opt_verbose=1 ;; #set -x;;
+    v) ;; #set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
     esac

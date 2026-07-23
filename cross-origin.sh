@@ -30,8 +30,7 @@ declare ORIGIN='https://jwt.io'       # add this to "Allowed Web Origins" of you
 declare CONNECTION='Username-Password-Authentication'
 declare SCOPE='openid profile email'
 
-declare -r CLIENT_META='{"name":"auth0.js","version":"9.0.2"}'
-declare -r CLIENT_META_B64=$(echo -n $CLIENT_META | base64)
+declare -r CLIENT_META_B64=$(echo -n '{"name":"auth0.js","version":"9.0.2"}' | base64)
 
 function usage() {
     cat <<END >&2
@@ -157,8 +156,7 @@ declare id_token=$(echo "${location}" | grep -oE "id_token=([^&]+)" | awk -F= '{
 declare state=$(echo "${location}" | grep -oE "state=([^&]+)" | awk -F= '{print $2}')
 
 ## TODO: check if `base64` installed
-declare access_token_json=$(echo ${access_token} | awk -F. '{print $2}' | base64 -di 2>/dev/null)
-declare id_token_json=$(echo ${id_token} | awk -F. '{print $2}' | base64 -di 2>/dev/null)
+declare id_token_json=$(echo "${id_token}" | awk -F. '{print $2}' | base64 -di 2>/dev/null)
 
 echo "Access Token: ${access_token}"
 echo "ID     Token: ${id_token_json}"
