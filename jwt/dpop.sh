@@ -94,7 +94,8 @@ case ${CURVE_NAME} in
         ;;
 esac
 
-readonly coords="$(echo "${PUBLIC_KEY}" | ${OPENSSL_CMD} ec -pubin -noout -text -conv_form uncompressed 2>/dev/null | grep -E "^ +.*" | tr -d ' \n' | sed 's/^...//' | tr -d ':')"
+coords="$(echo "${PUBLIC_KEY}" | ${OPENSSL_CMD} ec -pubin -noout -text -conv_form uncompressed 2>/dev/null | grep -E "^ +.*" | tr -d ' \n' | sed 's/^...//' | tr -d ':')"
+readonly coords
 
 readonly X_HEX=${coords:0:${#coords}/2} # first half
 readonly Y_HEX=${coords:${#coords}/2}   # second half

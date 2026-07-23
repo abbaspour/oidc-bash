@@ -46,10 +46,14 @@ done
 
 
 # header
-declare -r header=$(printf '{"alg": "%s", "typ": "JWT"}' "${algorithm}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+declare header
+header=$(printf '{"alg": "%s", "typ": "JWT"}' "${algorithm}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+readonly header
 
 # body
-declare -r body=$(cat "${file}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+declare body
+body=$(cat "${file}" | openssl base64 -e -A | tr '+' '-' | tr '/' '_' | sed -E s/=+$//)
+readonly body
 
 # signature
 declare signature=''

@@ -112,7 +112,9 @@ else
   HEADER_JSON='{"alg":"ES256","typ":"JWT"}'
 fi
 
-declare -r PAYLOAD_JSON=$(cat "${json_file}")
+declare PAYLOAD_JSON
+PAYLOAD_JSON=$(cat "${json_file}")
+readonly PAYLOAD_JSON
 
 HEADER_B64=$(printf '%s' "$HEADER_JSON" | b64url)
 PAYLOAD_B64=$(printf '%s' "$PAYLOAD_JSON" | b64url)

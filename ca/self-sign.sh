@@ -25,7 +25,8 @@ END
     exit $1
 }
 
-declare pair_name=$(hostname)
+declare pair_name
+pair_name=$(hostname)
 declare opt_verbose=0
 declare ec_mode=0
 declare key_type_prefix="rsa" # Default prefix

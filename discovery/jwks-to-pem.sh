@@ -73,7 +73,8 @@ fi
 
 [[ -n "${opt_verbose}" ]] && echo >&2 "> GET ${jwks_url}"
 
-declare jwks_json=$(curl -s "${jwks_url}")
+declare jwks_json
+jwks_json=$(curl -s "${jwks_url}")
 
 for k in $(echo "${jwks_json}" | jq -r '.keys[] .kid'); do
     [[ -n "${KID}" && ! "${k}" =~ ${KID} ]] && continue
@@ -86,7 +87,8 @@ for k in $(echo "${jwks_json}" | jq -r '.keys[] .kid'); do
         [[ -n "${ALG}" && "${key_alg}" != "${ALG}" ]] && continue
 
         # Get the key type (kty)
-        declare key_type=$(echo "${jwks_json}" | jq -r ".keys[] | select(.kid==\"${k}\" and .alg==\"${key_alg}\") | .kty")
+        declare key_type
+        key_type=$(echo "${jwks_json}" | jq -r ".keys[] | select(.kid==\"${k}\" and .alg==\"${key_alg}\") | .kty")
         [[ -n "${KTY}" && "${key_type}" != "${KTY}" ]] && continue
 
         echo "Exporting KID: ${k}, Algorithm: ${key_alg}, Key Type: ${key_type}"
@@ -95,7 +97,8 @@ for k in $(echo "${jwks_json}" | jq -r '.keys[] .kid'); do
 
         if [[ "${key_type}" == "RSA" ]]; then
             # Process RSA key using x5c certificate
-            declare x5c=$(echo "${jwks_json}" | jq -r ".keys[] | select(.kid==\"${k}\" and .alg==\"${key_alg}\") | .x5c[0]")
+            declare x5c
+            x5c=$(echo "${jwks_json}" | jq -r ".keys[] | select(.kid==\"${k}\" and .alg==\"${key_alg}\") | .x5c[0]")
 
             if [[ -n "${x5c}" && "${x5c}" != "null" ]]; then
                 echo '-----BEGIN CERTIFICATE-----' >"${cert_file}"

@@ -117,8 +117,10 @@ declare issuer="${DOMAIN}"
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
   discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
-  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
-  declare d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+  declare d_token
+  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare d_issuer
+  d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
   [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
 fi

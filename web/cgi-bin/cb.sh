@@ -15,7 +15,8 @@ set -uo pipefail
 
 DIR="${BASH_SOURCE[0]%/*}"
 [ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
-readonly DIR=$(cd "$DIR" && pwd)
+DIR=$(cd "$DIR" && pwd)
+readonly DIR
 
 url_decode() {
     local data="${1//+/ }"

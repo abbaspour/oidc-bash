@@ -285,7 +285,8 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
   [[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
   [[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
   [[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
-  readonly tmp_jwt=$(mktemp --suffix=.json)
+  tmp_jwt=$(mktemp --suffix=.json)
+  readonly tmp_jwt
   # shellcheck disable=SC2129
   printf "{\n \"iss\":\"%s\", \n " "${CLIENT_ID}" >> "${tmp_jwt}"
   echo "${authorize_params}" | awk -F'[=&]' '{
@@ -297,8 +298,10 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
                                    printf("\"%s\":\"%s\",\n ", $i, $(i+1))
                                  }
                                }' >> "${tmp_jwt}"
-  readonly jar_exp=$(date +%s --date='5 minutes')
-  readonly jar_now=$(date +%s)
+  jar_exp=$(date +%s --date='5 minutes')
+  readonly jar_exp
+  jar_now=$(date +%s)
+  readonly jar_now
   echo "\"aud\": \"${issuer}\", \"iat\": ${jar_now}, \"exp\": ${jar_exp}, \"nbf\": ${jar_now} }"  >> "${tmp_jwt}"
   signed_request=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${tmp_jwt}" -k "${key_id}" -t oauth-authz-req+jwt -A PS256)
   readonly signed_request
@@ -309,7 +312,9 @@ fi
 if [[ -n "${CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
   authorize_params+="&client_secret=${CLIENT_SECRET}"
 elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
-  declare -r signed_client_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
+  declare signed_client_assertion
+  signed_client_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
+  readonly signed_client_assertion
   authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 fi
 
@@ -320,8 +325,10 @@ if [[ ${opt_par} -ne 0 ]]; then                       # PAR
 
   #  --tlsv1.2 --cert transport.pem --key transport.key --cacert connectid-sandbox-ca.pem
   #  --header "x-fapi-interaction-id: $(random32)" \
-  declare -r request_uri=$("${CURL}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
+  declare request_uri
+  request_uri=$("${CURL}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
     -d "${authorize_params}" | jq -r '.request_uri')
+  readonly request_uri
   authorize_params="client_id=${CLIENT_ID}&request_uri=${request_uri}"
 
 elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
@@ -333,8 +340,10 @@ elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
 
   [[ -n "${opt_verbose}" ]] && echo >&2 "> POST ${bc_authorization_endpoint} ${authorize_params}"
 
-  declare -r auth_req_id=$("${CURL}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
+  declare auth_req_id
+  auth_req_id=$("${CURL}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
     -d "${authorize_params}" | jq -r '.auth_req_id')
+  readonly auth_req_id
 
   echo "auth_req_id: ${auth_req_id}"
   exit 0

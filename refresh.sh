@@ -80,7 +80,8 @@ declare token_endpoint="${DOMAIN}/${token_endpoint_path}"
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
   discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
-  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare d_token
+  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
 fi
 
@@ -95,7 +96,8 @@ declare audience=''
 
 [[ ${enable_session_transfer} -eq 1 ]] && audience="\"audience\":\"urn:${DOMAIN}:session_transfer\","
 
-declare BODY=$(cat <<EOL
+declare BODY
+BODY=$(cat <<EOL
 {
     "client_id":"${CLIENT_ID}",
     ${secret}

@@ -70,13 +70,19 @@ done
 
 declare ALG="${alg^^}"
 
-declare -r now=$(date +%s);
-declare -r exp=$((now + TTL));
-declare -r JTI="$(openssl rand -hex 16)"
+declare now
+now=$(date +%s)
+readonly now
+declare -r exp=$((now + TTL))
+declare JTI
+JTI="$(openssl rand -hex 16)"
+readonly JTI
 
-readonly body=$(printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${client_id}" "${client_id}" "${AUDIENCE}" "${exp}" "${JTI}")
+body=$(printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${client_id}" "${client_id}" "${AUDIENCE}" "${exp}" "${JTI}")
+readonly body
 
-readonly json=$(mktemp --suffix=.json)
+json=$(mktemp --suffix=.json)
+readonly json
 
 echo "${body}" > "${json}"
 

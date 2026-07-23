@@ -94,7 +94,8 @@ done
 [[ -n "${opt_myorg}" ]] && AUDIENCE="${DOMAIN}my-org/"
 
 if [[ -n "${private_pem}" ]]; then
-  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${DOMAIN}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  assertion=$("${DIR}"/jwt/client-assertion.sh -a "${DOMAIN}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}")
+  readonly assertion
   client_assertion=$(
     cat <<EOL
   , "client_assertion" : "${assertion}",
@@ -103,7 +104,7 @@ EOL
   )
 fi
 
-readonly BODY=$(cat <<EOL
+BODY=$(cat <<EOL
 {
     "client_id":"${CLIENT_ID}", ${secret}
     "audience":"${AUDIENCE}", ${organization}
@@ -111,6 +112,7 @@ readonly BODY=$(cat <<EOL
 }
 EOL
 )
+readonly BODY
 
 if [[ -n "${opt_verbose}" ]]; then
   echo >&2 "> POST ${DOMAIN}oauth/token"

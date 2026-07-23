@@ -113,8 +113,10 @@ if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare discovery_json
   discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
 
-  declare d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
-  declare d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+  declare d_token
+  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare d_issuer
+  d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
 
   [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
@@ -129,17 +131,20 @@ else
 fi
 
 if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
-  readonly assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
-  readonly client_assertion=$(cat <<EOL
+  assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
+  readonly assertion
+  client_assertion=$(cat <<EOL
     , "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
     "client_assertion" : "${assertion}"
 EOL
   )
+  readonly client_assertion
 else
   readonly client_assertion=''
 fi
 
-declare BODY=$(cat <<EOL
+declare BODY
+BODY=$(cat <<EOL
 {
     "client_id":"${CLIENT_ID}",
     ${secret}

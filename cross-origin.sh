@@ -30,7 +30,9 @@ declare ORIGIN='https://jwt.io'       # add this to "Allowed Web Origins" of you
 declare CONNECTION='Username-Password-Authentication'
 declare SCOPE='openid profile email'
 
-declare -r CLIENT_META_B64=$(echo -n '{"name":"auth0.js","version":"9.0.2"}' | base64)
+declare CLIENT_META_B64
+CLIENT_META_B64=$(echo -n '{"name":"auth0.js","version":"9.0.2"}' | base64)
+readonly CLIENT_META_B64
 
 function usage() {
     cat <<END >&2
@@ -102,7 +104,8 @@ done
 
 [[ -n "${opt_mgmnt}" ]] && AUDIENCE="https://${DOMAIN}/api/v2/"
 
-declare BODY=$(cat <<EOL
+declare BODY
+BODY=$(cat <<EOL
 {
     "client_id":"${CLIENT_ID}",
     "username":"${USERNAME}",
@@ -118,7 +121,8 @@ if [[ -n "${opt_verbose}" ]]; then
     echo "${BODY}" | jq . >&2
 fi
 
-declare co_response=$(curl -s -c cookie.txt -H "Content-Type: application/json" \
+declare co_response
+co_response=$(curl -s -c cookie.txt -H "Content-Type: application/json" \
     -H "origin: ${ORIGIN}" \
     -H "auth0-clients: ${CLIENT_META_B64}" \
     -d "${BODY}" https://${DOMAIN}/co/authenticate)
@@ -126,12 +130,14 @@ declare co_response=$(curl -s -c cookie.txt -H "Content-Type: application/json" 
 echo "CO Response: ${co_response}"
 
 ## TODO: check `jq` installed
-declare login_ticket=$(echo "${co_response}" | jq -cr .login_ticket)
+declare login_ticket
+login_ticket=$(echo "${co_response}" | jq -cr .login_ticket)
 echo "login_ticket=${login_ticket}"
 
 [[ ${login_ticket} == "null" ]] && { echo >&2 "login_ticket collection failed"; exit 3; }
 
-declare authorize_url="https://${DOMAIN}/authorize?client_id=${CLIENT_ID}&response_type=$(urlencode "token id_token")&redirect_uri=$(urlencode ${REDIRECT_URI})&login_ticket=${login_ticket}&nonce=n1" # &auth0Client=${CLIENT_META_B64}
+declare authorize_url
+authorize_url="https://${DOMAIN}/authorize?client_id=${CLIENT_ID}&response_type=$(urlencode "token id_token")&redirect_uri=$(urlencode ${REDIRECT_URI})&login_ticket=${login_ticket}&nonce=n1" # &auth0Client=${CLIENT_META_B64}
 
 [[ -n "${AUDIENCE}" ]] && authorize_url+="&audience=$(urlencode ${AUDIENCE})"
 [[ -n "${CONNECTION}" ]] && authorize_url+="&connection=${CONNECTION}"
@@ -143,7 +149,8 @@ echo "authorize_url: ${authorize_url}"
 
 [[ -n "${opt_verbose}" ]] && echo >&2 "> GET ${authorize_url}"
 
-declare location=$(curl -s -b cookie.txt $authorize_url | awk 'IGNORECASE = 1;/^location: /{print $2}')
+declare location
+location=$(curl -s -b cookie.txt $authorize_url | awk 'IGNORECASE = 1;/^location: /{print $2}')
 
 echo "Redirect location: ${location}"
 
@@ -151,12 +158,16 @@ echo "Redirect location: ${location}"
 [[ ${location} =~ ^/mf ]] && { echo >&2 "WARNING: MFA enabled. CO not possible without user interaction"; exit 3; }
 [[ ${location} =~ ^/decision ]] && { echo >&2 "WARNING: Consent required. CO not possible without user interaction. Try normal ./authorize.sh first."; exit 3; }
 
-declare access_token=$(echo "${location}" | grep -oE "access_token=([^&]+)" | awk -F= '{print $2}')
-declare id_token=$(echo "${location}" | grep -oE "id_token=([^&]+)" | awk -F= '{print $2}')
-declare state=$(echo "${location}" | grep -oE "state=([^&]+)" | awk -F= '{print $2}')
+declare access_token
+access_token=$(echo "${location}" | grep -oE "access_token=([^&]+)" | awk -F= '{print $2}')
+declare id_token
+id_token=$(echo "${location}" | grep -oE "id_token=([^&]+)" | awk -F= '{print $2}')
+declare state
+state=$(echo "${location}" | grep -oE "state=([^&]+)" | awk -F= '{print $2}')
 
 ## TODO: check if `base64` installed
-declare id_token_json=$(echo "${id_token}" | awk -F. '{print $2}' | base64 -di 2>/dev/null)
+declare id_token_json
+id_token_json=$(echo "${id_token}" | awk -F. '{print $2}' | base64 -di 2>/dev/null)
 
 echo "Access Token: ${access_token}"
 echo "ID     Token: ${id_token_json}"

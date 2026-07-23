@@ -54,7 +54,8 @@ done
 declare secret=''
 [[ -n "${CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${CLIENT_SECRET}\","
 
-declare BODY=$(cat <<EOL
+declare BODY
+BODY=$(cat <<EOL
 {
     "client_id":"${CLIENT_ID}",
     ${secret}

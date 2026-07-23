@@ -64,7 +64,8 @@ done
 
 
 # header
-readonly header=$(
+declare header
+header=$(
   jq -n \
     --arg typ "${typ}" \
     --arg alg "${alg}" \
@@ -75,11 +76,15 @@ readonly header=$(
     + ( if ($kid | length) > 0 then { kid: $kid } else {} end )
     ' | b64url
 )
+readonly header
 
 # body
-declare -r body=$(cat "${json_file}" | b64url)
+declare body
+body=$(cat "${json_file}" | b64url)
+readonly body
 
-declare alg_lower=$(echo -n "$alg" | tr '[:upper:]' '[:lower:]')
+declare alg_lower
+alg_lower=$(echo -n "$alg" | tr '[:upper:]' '[:lower:]')
 
 declare signature=''
 if [[ ${alg_lower} != 'none' ]]; then
