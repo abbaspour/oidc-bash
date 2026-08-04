@@ -92,22 +92,33 @@
             hRow.appendChild(hCell);
             jwtTable.appendChild(hRow);
 
-            var bRow = document.createElement('tr');
-            var hdrCell = document.createElement('td');
-            var pldCell = document.createElement('td');
-            hdrCell.style.verticalAlign = 'top';
-            pldCell.style.verticalAlign = 'top';
-
+            var hRow = document.createElement('tr');
+            var hLabelCell = document.createElement('td');
+            var hValueCell = document.createElement('td');
+            hLabelCell.style.verticalAlign = 'top';
+            var hLabel = document.createElement('b');
+            hLabel.textContent = 'header';
+            hLabelCell.appendChild(hLabel);
             var hdrPre = document.createElement('pre');
             hdrPre.textContent = JSON.stringify(decoded.header, null, 2);
+            hValueCell.appendChild(hdrPre);
+            hRow.appendChild(hLabelCell);
+            hRow.appendChild(hValueCell);
+            jwtTable.appendChild(hRow);
+
+            var pRow = document.createElement('tr');
+            var pLabelCell = document.createElement('td');
+            var pValueCell = document.createElement('td');
+            pLabelCell.style.verticalAlign = 'top';
+            var pLabel = document.createElement('b');
+            pLabel.textContent = 'payload';
+            pLabelCell.appendChild(pLabel);
             var pldPre = document.createElement('pre');
             pldPre.textContent = JSON.stringify(decoded.payload, null, 2);
-
-            hdrCell.appendChild(hdrPre);
-            pldCell.appendChild(pldPre);
-            bRow.appendChild(hdrCell);
-            bRow.appendChild(pldCell);
-            jwtTable.appendChild(bRow);
+            pValueCell.appendChild(pldPre);
+            pRow.appendChild(pLabelCell);
+            pRow.appendChild(pValueCell);
+            jwtTable.appendChild(pRow);
 
             table.parentNode.insertBefore(jwtTable, table.nextSibling);
 
