@@ -29,7 +29,7 @@ declare par_path='oauth/par'
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-T response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-R mode] [-D] [-P|-m|-M|-C|-N|-o|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-T response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-R mode] [-A max_age] [-D] [-P|-m|-M|-C|-N|-o|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
         -d domain      # OIDC provider domain
@@ -43,6 +43,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -s scopes      # comma separated list of scopes (default is "${SCOPE}")
         -p prompt      # prompt type: none, silent, login, consent
         -R mode        # response_mode of: query, web_message, form_post, fragment
+        -A max_age     # max_age in seconds (default is unset; can be set via MAX_AGE in .env)
         -S state       # state
         -n nonce       # nonce
         -H hint        # login hint (for CIBA should be JSON with sub and aud)
@@ -106,6 +107,7 @@ declare CLIENT_SECRET=''
 declare CONNECTION=''
 declare AUDIENCE=''
 declare PROMPT=''
+declare MAX_AGE=''
 
 declare opt_clipboard=''
 declare opt_flow='implicit'
@@ -137,7 +139,7 @@ declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:A:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOPJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -151,6 +153,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOP
     u) REDIRECT_URI=${OPTARG} ;;
     p) PROMPT=${OPTARG} ;;
     R) RESPONSE_MODE=${OPTARG} ;;
+    A) MAX_AGE=${OPTARG} ;;
     s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     S) opt_state=${OPTARG} ;;
     n) opt_nonce=${OPTARG} ;;
@@ -270,6 +273,7 @@ declare authorize_params="client_id=${CLIENT_ID}&${response_param}&nonce=$(urlen
 [[ -n "${CONNECTION}" ]] && authorize_params+="&connection=${CONNECTION}"
 [[ -n "${PROMPT}" ]] && authorize_params+="&prompt=${PROMPT}"
 [[ -n "${RESPONSE_MODE}" ]] && authorize_params+="&response_mode=${RESPONSE_MODE}"
+[[ -n "${MAX_AGE}" ]] && authorize_params+="&max_age=${MAX_AGE}"
 [[ -n "${opt_state}" ]] && authorize_params+="&state=$(urlencode "${opt_state}")"
 [[ -n "${opt_login_hint}" ]] && authorize_params+="&login_hint=$(urlencode "${opt_login_hint}")"
 [[ -n "${opt_id_token_hint}" ]] && authorize_params+="&id_token_hint=$(urlencode "${opt_id_token_hint}")"
