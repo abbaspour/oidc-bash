@@ -20,12 +20,18 @@
         return;
     }
 
+    var idToken = null;
+    var accessToken = null;
+
     search.split('&').forEach(function (pair) {
         var eq = pair.indexOf('=');
         var k = eq >= 0 ? pair.slice(0, eq) : pair;
         var v = eq >= 0 ? pair.slice(eq + 1) : '';
         k = decode(k);
         v = decode(v);
+
+        if (k === 'id_token') idToken = v;
+        if (k === 'access_token') accessToken = v;
 
         var tr = document.createElement('tr');
         var tdK = document.createElement('td');
@@ -50,4 +56,8 @@
 
         try { console.log(k + ' = ' + v); } catch (e) {}
     });
+
+    var lastInserted = table;
+    lastInserted = JwtUtil.renderDecodedJwt(lastInserted, 'id_token', idToken);
+    lastInserted = JwtUtil.renderDecodedJwt(lastInserted, 'access_token', accessToken);
 })();

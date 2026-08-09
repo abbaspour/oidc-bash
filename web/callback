@@ -8,6 +8,7 @@ code{word-break:break-all}
 .copy-btn:hover{opacity:0.7}</style></head>
 <body><h1>OIDC Callback</h1>
 <table></table>
+<script src="/js/jwt.js"></script>
 <script src="/js/query.js"></script>
 <script src="/js/copy.js"></script>
 <script src="/js/hash.js"></script>

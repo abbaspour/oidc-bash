@@ -9,32 +9,6 @@
         try { return decodeURIComponent(s.replace(/\+/g, ' ')); } catch (e) { return s; }
     };
 
-    var b64urlDecode = function (s) {
-        s = s.replace(/-/g, '+').replace(/_/g, '/');
-        while (s.length % 4) s += '=';
-        var bin = atob(s);
-        try {
-            return decodeURIComponent(bin.split('').map(function (c) {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-        } catch (e) {
-            return bin;
-        }
-    };
-
-    var decodeJwt = function (jwt) {
-        var parts = jwt.split('.');
-        if (parts.length < 2) return null;
-        try {
-            return {
-                header: JSON.parse(b64urlDecode(parts[0])),
-                payload: JSON.parse(b64urlDecode(parts[1]))
-            };
-        } catch (e) {
-            return null;
-        }
-    };
-
     var header = document.createElement('tr');
     var th = document.createElement('td');
     th.colSpan = 2;
@@ -43,6 +17,7 @@
     table.appendChild(header);
 
     var idToken = null;
+    var accessToken = null;
 
     hash.split('&').forEach(function (pair) {
         var eq = pair.indexOf('=');
@@ -52,6 +27,7 @@
         v = decode(v);
 
         if (k === 'id_token') idToken = v;
+        if (k === 'access_token') accessToken = v;
 
         var tr = document.createElement('tr');
         var tdK = document.createElement('td');
@@ -77,52 +53,7 @@
         try { console.log(k + ' = ' + v); } catch (e) {}
     });
 
-    if (idToken) {
-        var decoded = decodeJwt(idToken);
-        if (decoded) {
-            var jwtTable = document.createElement('table');
-            jwtTable.style.borderCollapse = 'collapse';
-            jwtTable.style.width = '100%';
-            jwtTable.style.marginTop = '1em';
-
-            var hRow = document.createElement('tr');
-            var hCell = document.createElement('td');
-            hCell.colSpan = 2;
-            hCell.innerHTML = '<b>Decoded id_token</b>';
-            hRow.appendChild(hCell);
-            jwtTable.appendChild(hRow);
-
-            var hRow = document.createElement('tr');
-            var hLabelCell = document.createElement('td');
-            var hValueCell = document.createElement('td');
-            hLabelCell.style.verticalAlign = 'top';
-            var hLabel = document.createElement('b');
-            hLabel.textContent = 'header';
-            hLabelCell.appendChild(hLabel);
-            var hdrPre = document.createElement('pre');
-            hdrPre.textContent = JSON.stringify(decoded.header, null, 2);
-            hValueCell.appendChild(hdrPre);
-            hRow.appendChild(hLabelCell);
-            hRow.appendChild(hValueCell);
-            jwtTable.appendChild(hRow);
-
-            var pRow = document.createElement('tr');
-            var pLabelCell = document.createElement('td');
-            var pValueCell = document.createElement('td');
-            pLabelCell.style.verticalAlign = 'top';
-            var pLabel = document.createElement('b');
-            pLabel.textContent = 'payload';
-            pLabelCell.appendChild(pLabel);
-            var pldPre = document.createElement('pre');
-            pldPre.textContent = JSON.stringify(decoded.payload, null, 2);
-            pValueCell.appendChild(pldPre);
-            pRow.appendChild(pLabelCell);
-            pRow.appendChild(pValueCell);
-            jwtTable.appendChild(pRow);
-
-            table.parentNode.insertBefore(jwtTable, table.nextSibling);
-
-            try { console.log('id_token header:', decoded.header); console.log('id_token payload:', decoded.payload); } catch (e) {}
-        }
-    }
+    var lastInserted = table;
+    lastInserted = JwtUtil.renderDecodedJwt(lastInserted, 'id_token', idToken);
+    lastInserted = JwtUtil.renderDecodedJwt(lastInserted, 'access_token', accessToken);
 })();

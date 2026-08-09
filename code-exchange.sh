@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
+# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/main/LICENSE)
 #
 # This script exchanges authorization_code obtained from authorization server to token assets
 ##########################################################################################
@@ -48,7 +48,7 @@ END
 declare DOMAIN=''
 declare CLIENT_ID=''
 declare CLIENT_SECRET=''
-declare REDIRECT_URI='https://jwt.io'
+declare REDIRECT_URI='http://local.abbaspour.net:1980'
 declare authorization_code=''
 declare code_verifier=''
 declare grant_type='authorization_code'
