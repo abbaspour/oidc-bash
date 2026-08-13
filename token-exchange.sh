@@ -14,7 +14,7 @@ DIR="${BASH_SOURCE[0]%/*}"
 [ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
 readonly DIR
 
-declare SCOPE='openid profile email'
+declare SCOPE=''
 
 function usage() {
     cat <<END >&2

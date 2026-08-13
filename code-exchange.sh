@@ -159,7 +159,7 @@ EOL
 
 if [[ -n "${dpop_pem_file}" ]]; then
     dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}")"
-    [[ -n "${opt_verbose}" ]] && echo >&2 "${dpop_header}"
+    echo >&2 "${dpop_header}"
 fi
 
 if [[ ${form_post} -eq 1 ]]; then
@@ -186,7 +186,7 @@ if [[ -n "${dpop_pem_file}" ]]; then
   rm -f "${_dpop_hdr_file}"
   if [[ -n "${_dpop_nonce}" ]]; then
     dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
-    [[ -n "${opt_verbose}" ]] && echo >&2 "${dpop_header}"
+    echo >&2 "${dpop_header}"
     curl -s --request POST \
       -H "${authorization_header}" \
       -H "${dpop_header}" \
