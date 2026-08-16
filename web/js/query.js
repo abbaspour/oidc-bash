@@ -1,6 +1,5 @@
 (function () {
-    var hash = window.location.hash.replace(/^#/, '');
-    if (!hash) return;
+    var search = window.location.search.replace(/^\?/, '');
 
     var table = document.querySelector('table');
     if (!table) return;
@@ -9,17 +8,22 @@
         try { return decodeURIComponent(s.replace(/\+/g, ' ')); } catch (e) { return s; }
     };
 
-    var header = document.createElement('tr');
-    var th = document.createElement('td');
-    th.colSpan = 2;
-    th.innerHTML = '<b>Fragment parameters</b>';
-    header.appendChild(th);
-    table.appendChild(header);
+    if (!search) {
+        var tr = document.createElement('tr');
+        var td = document.createElement('td');
+        td.colSpan = 2;
+        var i = document.createElement('i');
+        i.textContent = '(no query parameters)';
+        td.appendChild(i);
+        tr.appendChild(td);
+        table.appendChild(tr);
+        return;
+    }
 
     var idToken = null;
     var accessToken = null;
 
-    hash.split('&').forEach(function (pair) {
+    search.split('&').forEach(function (pair) {
         var eq = pair.indexOf('=');
         var k = eq >= 0 ? pair.slice(0, eq) : pair;
         var v = eq >= 0 ? pair.slice(eq + 1) : '';

@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>OIDC Callback</title>
+<style>body{font-family:sans-serif;max-width:900px;margin:2em auto;padding:0 1em}
+table{border-collapse:collapse;width:100%}
+td{border:1px solid #ccc;padding:6px 10px;vertical-align:top}
+code{word-break:break-all}
+.copy-btn{border:none;background:none;cursor:pointer;font-size:0.9em;padding:0 4px;vertical-align:middle}
+.copy-btn:hover{opacity:0.7}</style></head>
+<body><h1>OIDC Callback</h1>
+<table></table>
+<script src="/js/jwt.js"></script>
+<script src="/js/query.js"></script>
+<script src="/js/copy.js"></script>
+<script src="/js/hash.js"></script>
+<script src="/js/saml.js"></script>
+</body></html>

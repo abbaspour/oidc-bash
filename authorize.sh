@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
+# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/main/LICENSE)
 ##########################################################################################
 
 set -eo pipefail
@@ -29,7 +29,7 @@ declare par_path='oauth/par'
 
 function usage() {
     cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-T response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-R mode] [-D] [-P|-m|-M|-C|-N|-o|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r connection] [-T response_type] [-f flow] [-u callback] [-s scope] [-p prompt] [-R mode] [-A max_age] [-D] [-Q|-m|-M|-C|-N|-o|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
         -d domain      # OIDC provider domain
@@ -43,6 +43,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -s scopes      # comma separated list of scopes (default is "${SCOPE}")
         -p prompt      # prompt type: none, silent, login, consent
         -R mode        # response_mode of: query, web_message, form_post, fragment
+        -A max_age     # max_age in seconds (default is unset; can be set via MAX_AGE in .env)
         -S state       # state
         -n nonce       # nonce
         -H hint        # login hint (for CIBA should be JSON with sub and aud)
@@ -59,7 +60,8 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -G token       # send session_transfer_token as get cookie param
         -U endpoint    # authorization endpoint path (default is 'authorize')
         -D             # disable OIDC discovery; use default endpoints derived from -d/-t and -U
-        -P             # use PAR (pushed authorization request)
+        -P dpop.pem    # DPoP EC private key PEM file (binds PAR request/code to this key)
+        -Q             # use PAR (pushed authorization request)
         -J             # use JAR (JWT authorization request)
         -B message     # use back channel authorize (CIBA request) with given binding message
         -C             # copy to clipboard
@@ -106,6 +108,7 @@ declare CLIENT_SECRET=''
 declare CONNECTION=''
 declare AUDIENCE=''
 declare PROMPT=''
+declare MAX_AGE=''
 
 declare opt_clipboard=''
 declare opt_flow='implicit'
@@ -126,6 +129,7 @@ declare authorization_details=''
 declare protocol='oauth'
 declare opt_pp=1
 declare opt_par=0
+declare dpop_pem_file=''
 declare opt_jar=0
 declare opt_ciba=0
 declare opt_binding_message=''
@@ -137,7 +141,7 @@ declare opt_disable_discovery=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOPJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:A:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOP:QJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -151,6 +155,7 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOP
     u) REDIRECT_URI=${OPTARG} ;;
     p) PROMPT=${OPTARG} ;;
     R) RESPONSE_MODE=${OPTARG} ;;
+    A) MAX_AGE=${OPTARG} ;;
     s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     S) opt_state=${OPTARG} ;;
     n) opt_nonce=${OPTARG} ;;
@@ -169,7 +174,8 @@ while getopts "e:t:d:c:x:a:r:R:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOP
     U) authorization_path="${OPTARG}";;
     D) opt_disable_discovery=1 ;;
     C) opt_clipboard=1 ;;
-    P) opt_par=1 ;;
+    P) dpop_pem_file=${OPTARG} ;;
+    Q) opt_par=1 ;;
     J) opt_jar=1 ;;
     B) opt_ciba=1; opt_binding_message="${OPTARG}" ;;
     N) opt_pp=0 ;;
@@ -270,6 +276,7 @@ declare authorize_params="client_id=${CLIENT_ID}&${response_param}&nonce=$(urlen
 [[ -n "${CONNECTION}" ]] && authorize_params+="&connection=${CONNECTION}"
 [[ -n "${PROMPT}" ]] && authorize_params+="&prompt=${PROMPT}"
 [[ -n "${RESPONSE_MODE}" ]] && authorize_params+="&response_mode=${RESPONSE_MODE}"
+[[ -n "${MAX_AGE}" ]] && authorize_params+="&max_age=${MAX_AGE}"
 [[ -n "${opt_state}" ]] && authorize_params+="&state=$(urlencode "${opt_state}")"
 [[ -n "${opt_login_hint}" ]] && authorize_params+="&login_hint=$(urlencode "${opt_login_hint}")"
 [[ -n "${opt_id_token_hint}" ]] && authorize_params+="&id_token_hint=$(urlencode "${opt_id_token_hint}")"
@@ -326,10 +333,37 @@ if [[ ${opt_par} -ne 0 ]]; then                       # PAR
   #  --tlsv1.2 --cert transport.pem --key transport.key --cacert connectid-sandbox-ca.pem
   #  --header "x-fapi-interaction-id: $(random32)" \
   declare request_uri
-  request_uri=$("${CURL}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
-    -d "${authorize_params}" | jq -r '.request_uri')
+  declare par_response
+  declare par_dpop_header=''
+
+  if [[ -n "${dpop_pem_file}" ]]; then                # DPoP-bound PAR
+    par_dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${par_endpoint}")"
+    echo >&2 "${par_dpop_header}"
+
+    declare _dpop_hdr_file
+    _dpop_hdr_file=$(mktemp)
+    par_response=$("${CURL}" -s -k -D "${_dpop_hdr_file}" --header "accept: application/json" --header "${par_dpop_header}" --url "${par_endpoint}" \
+      -d "${authorize_params}")
+    declare _dpop_nonce
+    _dpop_nonce=$(grep -i '^dpop-nonce:' "${_dpop_hdr_file}" | awk '{print $2}' | tr -d '\r\n' || true)
+    rm -f "${_dpop_hdr_file}"
+
+    if [[ -n "${_dpop_nonce}" ]] && echo "${par_response}" | jq -e '.error == "use_dpop_nonce"' >/dev/null 2>&1; then
+      par_dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${par_endpoint}" -n "${_dpop_nonce}")"
+      echo >&2 "${par_dpop_header}"
+      par_response=$("${CURL}" -s -k --header "accept: application/json" --header "${par_dpop_header}" --url "${par_endpoint}" \
+        -d "${authorize_params}")
+    fi
+  else
+    par_response=$("${CURL}" -s -k --header "accept: application/json" --url "${par_endpoint}" \
+      -d "${authorize_params}")
+  fi
+
+  request_uri=$(echo "${par_response}" | jq -r '.request_uri')
   readonly request_uri
   authorize_params="client_id=${CLIENT_ID}&request_uri=${request_uri}"
+
+  [[ -n "${dpop_pem_file}" ]] && echo >&2 "note: reuse -P ${dpop_pem_file} in code-exchange.sh to complete the DPoP-bound code exchange"
 
 elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
   [[ -z "${opt_login_hint}" ]] && { echo >&2 "login_hint required for CIBA"; exit 1; }

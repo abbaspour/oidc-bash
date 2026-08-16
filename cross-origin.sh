@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
+# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/main/LICENSE)
 ##########################################################################################
 # Auth0-specific: targets Auth0's legacy /co/authenticate cross-origin endpoint.
 

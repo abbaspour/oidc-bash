@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
+# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/main/LICENSE)
 #
 # This script exchanges authorization_code obtained from authorization server to token assets
 ##########################################################################################
@@ -48,7 +48,7 @@ END
 declare DOMAIN=''
 declare CLIENT_ID=''
 declare CLIENT_SECRET=''
-declare REDIRECT_URI='https://jwt.io'
+declare REDIRECT_URI='http://local.abbaspour.net:1980'
 declare authorization_code=''
 declare code_verifier=''
 declare grant_type='authorization_code'
@@ -159,7 +159,7 @@ EOL
 
 if [[ -n "${dpop_pem_file}" ]]; then
     dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}")"
-    [[ -n "${opt_verbose}" ]] && echo >&2 "${dpop_header}"
+    echo >&2 "${dpop_header}"
 fi
 
 if [[ ${form_post} -eq 1 ]]; then
@@ -186,7 +186,7 @@ if [[ -n "${dpop_pem_file}" ]]; then
   rm -f "${_dpop_hdr_file}"
   if [[ -n "${_dpop_nonce}" ]]; then
     dpop_header="DPoP: $("${DIR}"/jwt/dpop.sh -r "${dpop_pem_file}" -m POST -u "${token_endpoint}" -n "${_dpop_nonce}")"
-    [[ -n "${opt_verbose}" ]] && echo >&2 "${dpop_header}"
+    echo >&2 "${dpop_header}"
     curl -s --request POST \
       -H "${authorization_header}" \
       -H "${dpop_header}" \

@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2022-06-12
-# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
+# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/main/LICENSE)
 ##########################################################################################
 
 function usage() {

@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2025-10-13
-# License: MIT (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
+# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/main/LICENSE)
 ##########################################################################################
 
 # https://datatracker.ietf.org/doc/html/rfc9728

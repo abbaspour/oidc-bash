@@ -3,7 +3,7 @@
 ##########################################################################################
 # Author: Amin Abbaspour
 # Date: 2026-06-26
-# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/master/LICENSE)
+# License: LGPL 2.1 (https://github.com/abbaspour/oidc-bash/blob/main/LICENSE)
 #
 # cb.sh: CGI callback handler for OAuth2/OIDC redirect_uri.
 # Parses QUERY_STRING (GET) or stdin (POST form), renders an HTML key-value table,
@@ -72,6 +72,8 @@ fi
 
 copy_script=''
 [[ -f "${DIR}/../js/copy.js" ]] && copy_script=$(<"${DIR}/../js/copy.js")
+jwt_script=''
+[[ -f "${DIR}/../js/jwt.js" ]] && jwt_script=$(<"${DIR}/../js/jwt.js")
 script_content=''
 [[ -f "${DIR}/../js/hash.js" ]] && script_content=$(<"${DIR}/../js/hash.js")
 saml_script=''
@@ -90,6 +92,7 @@ code{word-break:break-all}
 <body><h1>OIDC Callback</h1>
 <table>${html_rows}</table>
 <script>${copy_script}</script>
+<script>${jwt_script}</script>
 <script>${script_content}</script>
 <script>${saml_script}</script>
 </body></html>
