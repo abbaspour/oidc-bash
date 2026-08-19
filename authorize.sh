@@ -292,25 +292,8 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
   [[ -z "${key_id}" ]] && { echo >&2 "ERROR: key_id undefined"; exit 2; }
   [[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
   [[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
-  tmp_jwt=$(mktemp --suffix=.json)
-  readonly tmp_jwt
-  # shellcheck disable=SC2129
-  printf "{\n \"iss\":\"%s\", \n " "${CLIENT_ID}" >> "${tmp_jwt}"
-  echo "${authorize_params}" | awk -F'[=&]' '{
-                                 for (i=1;i<=NF;i+=2) {
-                                   gsub(/\+/," ",$(i+1))
-                                   gsub(/%20/," ",$(i+1))
-                                   gsub(/%3A/,":",$(i+1))
-                                   gsub(/%2F/,"/",$(i+1))
-                                   printf("\"%s\":\"%s\",\n ", $i, $(i+1))
-                                 }
-                               }' >> "${tmp_jwt}"
-  jar_exp=$(date +%s --date='5 minutes')
-  readonly jar_exp
-  jar_now=$(date +%s)
-  readonly jar_now
-  echo "\"aud\": \"${issuer}\", \"iat\": ${jar_now}, \"exp\": ${jar_exp}, \"nbf\": ${jar_now} }"  >> "${tmp_jwt}"
-  signed_request=$("${DIR}/jwt/sign-rs256.sh" -p "${key_file}" -f "${tmp_jwt}" -k "${key_id}" -t oauth-authz-req+jwt -A PS256)
+  declare signed_request
+  signed_request=$("${DIR}/jwt/jar.sh" -a "${issuer}" -i "${CLIENT_ID}" -k "${key_id}" -f "${key_file}" -P "${authorize_params}")
   readonly signed_request
   echo "$signed_request"
   authorize_params="client_id=${CLIENT_ID}&request=${signed_request}"
@@ -330,8 +313,6 @@ if [[ ${opt_par} -ne 0 ]]; then                       # PAR
 
   [[ -n "${opt_verbose}" ]] && echo >&2 "> POST ${par_endpoint} ${authorize_params}"
 
-  #  --tlsv1.2 --cert transport.pem --key transport.key --cacert connectid-sandbox-ca.pem
-  #  --header "x-fapi-interaction-id: $(random32)" \
   declare request_uri
   declare par_response
   declare par_dpop_header=''
