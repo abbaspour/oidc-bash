@@ -43,6 +43,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-u username] [-p pass
         -K private.pem # client private key pem file
         -C cert.pem    # client certificate for mTLS
         -D             # disable OIDC discovery; use default endpoints
+        -W             # force-renew discovery cache (bypass any cached openid-configuration)
         -h|?           # usage
         -v             # verbose
 
@@ -73,11 +74,12 @@ declare client_certificate=''
 
 declare token_endpoint_path='oauth/token'
 declare opt_disable_discovery=0
+declare opt_force_refresh=0
 declare opt_verbose=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:K:C:DSAmMOhv?" opt; do
+while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:K:C:DWSAmMOhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -100,6 +102,7 @@ while getopts "e:t:u:p:d:c:x:a:r:s:i:n:k:K:C:DSAmMOhv?" opt; do
   m) opt_myaccount_api=1 ;;
   O) opt_myorg_api=1 ;;
   D) opt_disable_discovery=1 ;;
+  W) opt_force_refresh=1 ;;
   v) opt_verbose=1 ;; #set -x;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
@@ -123,13 +126,14 @@ declare issuer="${DOMAIN}"
 
 # OIDC Discovery to resolve token endpoint (unless disabled via -D)
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
-  declare discovery_json
-  discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
+  declare -a discovery_args=(-d "${DOMAIN}" -f issuer -f token_endpoint)
+  [[ ${opt_force_refresh} -eq 1 ]] && discovery_args+=(-W)
 
-  declare d_token
-  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
-  declare d_issuer
-  d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+  declare -a discovery_vals
+  mapfile -t discovery_vals < <("${DIR}/discover.sh" "${discovery_args[@]}")
+
+  d_issuer="${discovery_vals[0]}"
+  d_token="${discovery_vals[1]}"
 
   [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"

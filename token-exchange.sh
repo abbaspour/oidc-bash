@@ -38,6 +38,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-k
         -f realm              # FCAT (Token Vault) mode + connection name (Auth0-specific grant/token-type)
         -p                    # HTTP form post (default is application/json)
         -D                    # disable OIDC discovery; use default endpoint /oauth/token
+        -W                    # force-renew discovery cache (bypass any cached openid-configuration)
         -a audience           # Audience
         -r resource           # Resource (RFC-8707 / RFC-8693 resource parameter)
         -s scopes             # comma separated list of scopes (default is "${SCOPE}")
@@ -69,10 +70,11 @@ declare opt_verbose=''
 declare form_post=0
 declare content_type='application/json'
 declare opt_disable_discovery=0
+declare opt_force_refresh=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:k:K:a:i:I:u:U:g:G:A:s:f:r:RJpDhv?" opt; do
+while getopts "e:t:d:c:x:k:K:a:i:I:u:U:g:G:A:s:f:r:RJpDWhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -99,6 +101,7 @@ while getopts "e:t:d:c:x:k:K:a:i:I:u:U:g:G:A:s:f:r:RJpDhv?" opt; do
        realm=${OPTARG} ;;
     p) form_post=1; content_type='application/x-www-form-urlencoded' ;;
     D) opt_disable_discovery=1 ;;
+    W) opt_force_refresh=1 ;;
     v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
     *) usage 1 ;;
@@ -115,12 +118,15 @@ declare issuer="${DOMAIN}"
 [[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
-  declare discovery_json
-  discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
-  declare d_token
-  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
-  declare d_issuer
-  d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+  declare -a discovery_args=(-d "${DOMAIN}" -f issuer -f token_endpoint)
+  [[ ${opt_force_refresh} -eq 1 ]] && discovery_args+=(-W)
+
+  declare -a discovery_vals
+  mapfile -t discovery_vals < <("${DIR}/discover.sh" "${discovery_args[@]}")
+
+  d_issuer="${discovery_vals[0]}"
+  d_token="${discovery_vals[1]}"
+
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
   [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
 fi

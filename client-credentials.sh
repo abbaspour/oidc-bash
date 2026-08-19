@@ -31,6 +31,8 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-a
         -n api_key     # cname_api_key
         -C cert.pem    # client certificate for mTLS
         -S             # mark request as CA signed
+        -D             # disable OIDC discovery; use default endpoint oauth/token
+        -W             # force-renew discovery cache (bypass any cached openid-configuration)
         -h|?           # usage
         -v             # verbose
 
@@ -56,10 +58,12 @@ declare ca_signed='FAILED: self signed certificate'
 declare opt_mgmnt=''
 declare opt_myorg=''
 declare opt_verbose=''
+declare opt_disable_discovery=0
+declare opt_force_refresh=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:a:o:x:k:K:n:C:OSMhv?" opt; do
+while getopts "e:t:d:c:a:o:x:k:K:n:C:OSMDWhv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -75,6 +79,8 @@ while getopts "e:t:d:c:a:o:x:k:K:n:C:OSMhv?" opt; do
   S) ca_signed='SUCCESS' ;;
   M) opt_mgmnt=1 ;;
   O) opt_myorg=1 ;;
+  D) opt_disable_discovery=1 ;;
+  W) opt_force_refresh=1 ;;
   v) opt_verbose=1 ;; #set -x;;
   h | ?) usage 0 ;;
   *) usage 1 ;;
@@ -92,6 +98,20 @@ done
 
 [[ -n "${opt_mgmnt}" ]] && AUDIENCE="${DOMAIN}api/v2/"
 [[ -n "${opt_myorg}" ]] && AUDIENCE="${DOMAIN}my-org/"
+
+declare token_endpoint="${DOMAIN}oauth/token"
+
+# OIDC Discovery to resolve token endpoint (unless disabled via -D); -W forces a cache-bypassing re-fetch
+if [[ ${opt_disable_discovery} -eq 0 ]]; then
+  declare -a discovery_args=(-d "${DOMAIN}" -f token_endpoint)
+  [[ ${opt_force_refresh} -eq 1 ]] && discovery_args+=(-W)
+
+  declare -a discovery_vals
+  mapfile -t discovery_vals < <("${DIR}/discover.sh" "${discovery_args[@]}")
+
+  d_token="${discovery_vals[0]}"
+  [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
+fi
 
 if [[ -n "${private_pem}" ]]; then
   assertion=$("${DIR}"/jwt/client-assertion.sh -a "${DOMAIN}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}")
@@ -115,18 +135,18 @@ EOL
 readonly BODY
 
 if [[ -n "${opt_verbose}" ]]; then
-  echo >&2 "> POST ${DOMAIN}oauth/token"
+  echo >&2 "> POST ${token_endpoint}"
   echo "${BODY}" | jq . >&2
 fi
 
 if [[ -z "${cname_api_key}"  ]]; then
-  curl -s -k --header 'content-type: application/json' -d "${BODY}" "${DOMAIN}oauth/token" | jq .
+  curl -s -k --header 'content-type: application/json' -d "${BODY}" "${token_endpoint}" | jq .
 else
   curl -s -k --header 'content-type: application/json' -d "${BODY}" \
     --header "cname-api-key: ${cname_api_key}" \
     --header "client-certificate: ${client_certificate}" \
     --header "client-certificate-ca-verified: ${ca_signed}" \
-    "${DOMAIN}oauth/token" | jq .
+    "${token_endpoint}" | jq .
 fi
 
 echo
