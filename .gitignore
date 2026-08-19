@@ -3,3 +3,4 @@ env.inc
 *.json
 *.pem
 cookie.txt
+.cache/

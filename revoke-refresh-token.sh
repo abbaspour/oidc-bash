@@ -17,6 +17,8 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-r
         -c client_id   # OAuth2/OIDC client ID
         -x secret      # OAuth2/OIDC client secret (optional for public clients)
         -r token       # refresh_token
+        -D             # disable OIDC discovery; use default endpoint oauth/revoke
+        -W             # force-renew discovery cache (bypass any cached openid-configuration)
         -h|?           # usage
         -v             # verbose
 
@@ -31,8 +33,10 @@ declare CLIENT_ID=''
 declare CLIENT_SECRET=''
 declare opt_verbose=0
 declare refresh_token=''
+declare opt_disable_discovery=0
+declare opt_force_refresh=0
 
-while getopts "e:t:d:c:r:x:hv?" opt
+while getopts "e:t:d:c:r:x:DWhv?" opt
 do
     case ${opt} in
         e) source "${OPTARG}";;
@@ -41,6 +45,8 @@ do
         c) CLIENT_ID=${OPTARG};;
         x) CLIENT_SECRET=${OPTARG};;
         r) refresh_token=${OPTARG};;
+        D) opt_disable_discovery=1;;
+        W) opt_force_refresh=1;;
         v) opt_verbose=1;; #set -x;;
         h|?) usage 0;;
         *) usage 1;;
@@ -64,13 +70,27 @@ BODY=$(cat <<EOL
 EOL
 )
 
+declare revocation_endpoint="https://${DOMAIN}/oauth/revoke"
+
+# OIDC Discovery to resolve revocation endpoint (unless disabled via -D); -W forces a cache-bypassing re-fetch
+if [[ ${opt_disable_discovery} -eq 0 ]]; then
+    declare -a discovery_args=(-d "${DOMAIN}" -f revocation_endpoint)
+    [[ ${opt_force_refresh} -eq 1 ]] && discovery_args+=(-W)
+
+    declare -a discovery_vals
+    mapfile -t discovery_vals < <("${DIR}/discover.sh" "${discovery_args[@]}")
+
+    d_revoke="${discovery_vals[0]}"
+    [[ -n "${d_revoke}" ]] && revocation_endpoint="${d_revoke}"
+fi
+
 if [[ -n "${opt_verbose}" ]]; then
-    echo >&2 "> POST https://${DOMAIN}/oauth/revoke"
+    echo >&2 "> POST ${revocation_endpoint}"
     echo >&2 "${BODY}"
 fi
 
 curl --request POST \
-  --url "https://${DOMAIN}/oauth/revoke" \
+  --url "${revocation_endpoint}" \
   --header 'content-type: application/json' \
   --data "${BODY}"
 

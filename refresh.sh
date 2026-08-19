@@ -27,6 +27,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-r
         -P private.pem # DPoP EC private key PEM file
         -g             # enable session_transfer audience for native to web
         -D             # disable OIDC discovery; use default endpoints
+        -W             # force-renew discovery cache (bypass any cached openid-configuration)
         -h|?           # usage
         -v             # verbose
 
@@ -46,11 +47,12 @@ declare SCOPE=''
 declare enable_session_transfer=0
 declare token_endpoint_path='oauth/token'
 declare opt_disable_discovery=0
+declare opt_force_refresh=0
 declare dpop_pem_file=''
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:r:a:x:s:P:Dghv?" opt; do
+while getopts "e:t:d:c:r:a:x:s:P:DWghv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -62,6 +64,7 @@ while getopts "e:t:d:c:r:a:x:s:P:Dghv?" opt; do
     s) SCOPE=$(echo "${OPTARG}" | tr ',' ' ') ;;
     P) dpop_pem_file=${OPTARG} ;;
     D) opt_disable_discovery=1 ;;
+    W) opt_force_refresh=1 ;;
     g) enable_session_transfer=1 ;;
     v) opt_verbose=1 ;; #set -x;;
     h | ?) usage 0 ;;
@@ -76,12 +79,15 @@ done
 [[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
 declare token_endpoint="${DOMAIN}/${token_endpoint_path}"
 
-# OIDC Discovery to resolve token endpoint (unless disabled via -D)
+# OIDC Discovery to resolve token endpoint (unless disabled via -D); -W forces a cache-bypassing re-fetch
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
-  declare discovery_json
-  discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
-  declare d_token
-  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
+  declare -a discovery_args=(-d "${DOMAIN}" -f token_endpoint)
+  [[ ${opt_force_refresh} -eq 1 ]] && discovery_args+=(-W)
+
+  declare -a discovery_vals
+  mapfile -t discovery_vals < <("${DIR}/discover.sh" "${discovery_args[@]}")
+
+  d_token="${discovery_vals[0]}"
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
 fi
 

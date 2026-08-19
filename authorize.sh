@@ -60,6 +60,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -G token       # send session_transfer_token as get cookie param
         -U endpoint    # authorization endpoint path (default is 'authorize')
         -D             # disable OIDC discovery; use default endpoints derived from -d/-t and -U
+        -W             # force-renew discovery cache (bypass any cached openid-configuration)
         -P dpop.pem    # DPoP EC private key PEM file (binds PAR request/code to this key)
         -Q             # use PAR (pushed authorization request)
         -J             # use JAR (JWT authorization request)
@@ -138,10 +139,11 @@ declare opt_session_transfer_token_query=''
 declare opt_session_transfer_token_cookie=''
 declare opt_verbose=0
 declare opt_disable_discovery=0
+declare opt_force_refresh=0
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:A:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFCOP:QJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:A:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DWmMFCOP:QJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -173,6 +175,7 @@ while getopts "e:t:d:c:x:a:r:R:A:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DmMFC
     G) opt_session_transfer_token_cookie="${OPTARG}";;
     U) authorization_path="${OPTARG}";;
     D) opt_disable_discovery=1 ;;
+    W) opt_force_refresh=1 ;;
     C) opt_clipboard=1 ;;
     P) dpop_pem_file=${OPTARG} ;;
     Q) opt_par=1 ;;
@@ -211,17 +214,18 @@ declare par_endpoint="${DOMAIN}/${par_path}"
 declare authorization_endpoint="${DOMAIN}/${authorization_path}"
 declare bc_authorization_endpoint="${DOMAIN}/${bc_authorization_path}"
 
-# OIDC Discovery (unless disabled with -D)
+# OIDC Discovery (unless disabled with -D); -W forces a cache-bypassing re-fetch
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
-    # Use -k to allow dev environments with self-signed; consistent with later curl usage
-    declare discovery_json
-    discovery_json=$(${CURL} -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
+    declare -a discovery_args=(-d "${DOMAIN}" -f issuer -f authorization_endpoint -f pushed_authorization_request_endpoint -f backchannel_authentication_endpoint)
+    [[ ${opt_force_refresh} -eq 1 ]] && discovery_args+=(-W)
 
-    # Extract fields if present
-    d_authz=$(echo "${discovery_json}" | jq -r '.authorization_endpoint // empty')
-    d_par=$(echo "${discovery_json}" | jq -r '.pushed_authorization_request_endpoint // empty')
-    d_ciba=$(echo "${discovery_json}" | jq -r '.backchannel_authentication_endpoint // empty')
-    d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+    declare -a discovery_vals
+    mapfile -t discovery_vals < <("${DIR}/discover.sh" "${discovery_args[@]}")
+
+    d_issuer="${discovery_vals[0]}"
+    d_authz="${discovery_vals[1]}"
+    d_par="${discovery_vals[2]}"
+    d_ciba="${discovery_vals[3]}"
 
     # Override defaults when discovery provides values
     [[ -n "${d_authz}" ]] && authorization_endpoint="${d_authz}"

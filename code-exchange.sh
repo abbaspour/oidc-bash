@@ -36,6 +36,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X
         -b             # HTTP Basic authentication (default is secret in payload)
         -p             # HTTP form post (default is application/json)
         -D             # disable OIDC discovery; use default endpoints
+        -W             # force-renew discovery cache (bypass any cached openid-configuration)
         -h|?           # usage
         -v             # verbose
 
@@ -61,11 +62,12 @@ declare token_endpoint_path='oauth/token'
 declare code_type='code'
 declare opt_verbose=''
 declare opt_disable_discovery=0
+declare opt_force_refresh=0
 declare content_type='application/json'
 
 [[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:Dbphv?" opt; do
+while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:DWbphv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -83,6 +85,7 @@ while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:Dbphv?" opt; do
   C) code_type='device_code'; grant_type='urn:ietf:params:oauth:grant-type:device_code'; authorization_code=${OPTARG} ;;
   r) code_type='auth_req_id'; grant_type='urn:openid:params:grant-type:ciba'; authorization_code=${OPTARG} ;;
   D) opt_disable_discovery=1 ;;
+  W) opt_force_refresh=1 ;;
   b) http_basic=1 ;;
   p) form_post=1; content_type='application/x-www-form-urlencoded' ;;
   v) opt_verbose=1;; #set -x ;;
@@ -108,15 +111,16 @@ declare dpop_header=''
 
 declare assertion=''
 
-# OIDC Discovery to resolve token endpoint (unless disabled via -D)
+# OIDC Discovery to resolve token endpoint (unless disabled via -D); -W forces a cache-bypassing re-fetch
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
-  declare discovery_json
-  discovery_json=$(curl -s -k --header "accept: application/json" --url "${DOMAIN}/.well-known/openid-configuration" || true)
+  declare -a discovery_args=(-d "${DOMAIN}" -f issuer -f token_endpoint)
+  [[ ${opt_force_refresh} -eq 1 ]] && discovery_args+=(-W)
 
-  declare d_token
-  d_token=$(echo "${discovery_json}" | jq -r '.token_endpoint // empty')
-  declare d_issuer
-  d_issuer=$(echo "${discovery_json}" | jq -r '.issuer // empty')
+  declare -a discovery_vals
+  mapfile -t discovery_vals < <("${DIR}/discover.sh" "${discovery_args[@]}")
+
+  d_issuer="${discovery_vals[0]}"
+  d_token="${discovery_vals[1]}"
 
   [[ -n "${d_issuer}" ]] && issuer="${d_issuer}"
   [[ -n "${d_token}" ]] && token_endpoint="${d_token}"
