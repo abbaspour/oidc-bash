@@ -1,0 +1,11 @@
+{
+  "name": "oidc-bash-jwt",
+  "version": "0.1.0",
+  "description": "oidc-bash-jwt",
+  "author": "Amin Abbaspour <amin@auth0.com>",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "jose": "^6.2"
+  }
+}
