@@ -13,13 +13,18 @@
 
 set -uo pipefail
 
+readonly MAX_PARAMS_LEN=65536   # cap processed query/body size to bound CPU/memory on oversized requests
+
 DIR="${BASH_SOURCE[0]%/*}"
 [ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
 DIR=$(cd "$DIR" && pwd)
 readonly DIR
 
+# Decodes only genuine %XX triples. Pre-doubling any literal backslash already present in
+# the input stops printf %b from reinterpreting attacker-supplied \n, \e, \cX, etc. as escapes.
 url_decode() {
     local data="${1//+/ }"
+    data="${data//\\/\\\\}"
     printf '%b' "${data//%/\\x}"
 }
 
@@ -32,6 +37,12 @@ html_escape() {
     printf '%s' "$s"
 }
 
+# Strips control characters so attacker-influenced values can't forge extra log lines
+# or inject terminal escape sequences when this log is viewed/tailed.
+sanitize_log() {
+    printf '%s' "$1" | tr -d '[:cntrl:]'
+}
+
 method="${REQUEST_METHOD:-GET}"
 query="${QUERY_STRING:-}"
 
@@ -39,7 +50,9 @@ req_body=''
 if [[ "$method" == "POST" && "${CONTENT_TYPE:-}" == application/x-www-form-urlencoded* ]]; then
     content_length="${CONTENT_LENGTH:-0}"
     if [[ "$content_length" =~ ^[0-9]+$ && "$content_length" -gt 0 ]]; then
-        IFS= read -r -N "$content_length" req_body || true
+        read_len=$content_length
+        (( read_len > MAX_PARAMS_LEN )) && read_len=$MAX_PARAMS_LEN
+        IFS= read -r -N "$read_len" req_body || true
     fi
 fi
 
@@ -49,6 +62,7 @@ if [[ "$method" == "POST" && -n "$req_body" ]]; then
     params="$req_body"
     source_label='form'
 fi
+[[ ${#params} -gt $MAX_PARAMS_LEN ]] && params="${params:0:$MAX_PARAMS_LEN}"
 
 echo >&2 "[$(date '+%Y-%m-%d %H:%M:%S')] ${method} /cgi-bin/cb.sh${query:+?${query}}"
 
@@ -62,7 +76,7 @@ if [[ -n "$params" ]]; then
         [[ "$pair" == *=* ]] && value="${pair#*=}"
         key=$(url_decode "$key")
         value=$(url_decode "$value")
-        printf >&2 '  %s = %s\n' "$key" "$value"
+        printf >&2 '  %s = %s\n' "$(sanitize_log "$key")" "$(sanitize_log "$value")"
         html_rows+="<tr><td><b>$(html_escape "$key")</b></td><td><code>$(html_escape "$value")</code> <button type=\"button\" class=\"copy-btn\" title=\"Copy to clipboard\" aria-label=\"Copy to clipboard\">📋</button></td></tr>"
     done
 else
@@ -79,7 +93,7 @@ script_content=''
 saml_script=''
 [[ -f "${DIR}/../js/saml.js" ]] && saml_script=$(<"${DIR}/../js/saml.js")
 
-printf 'Content-Type: text/html; charset=utf-8\n\n'
+printf 'Content-Type: text/html; charset=utf-8\nCache-Control: no-store\nX-Frame-Options: DENY\n\n'
 cat <<HTML
 <!doctype html>
 <html><head><meta charset="utf-8"><title>OIDC Callback</title>
