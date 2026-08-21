@@ -22,11 +22,11 @@ declare TTL=300
 
 function usage() {
     cat <<END >&2
-USAGE: $0 -a audience -i client_id -f pem -P params [-k kid] [-A alg] [-t ttl] [-v|-h]
+USAGE: $0 -a audience -i client_id -p pem -P params [-k kid] [-A alg] [-t ttl] [-v|-h]
         -a audience    # authorization server issuer (used as JWT aud)
         -i client_id   # client_id (used as JWT iss)
         -k kid         # signing key id
-        -f pem         # private key PEM file
+        -p pem         # private key PEM file
         -P params      # authorize request params as a URL query string, eg "response_type=code&scope=openid"
         -A alg         # signing algorithm. default ${alg}
         -t ttl         # TTL in seconds. default is ${TTL}
@@ -34,7 +34,7 @@ USAGE: $0 -a audience -i client_id -f pem -P params [-k kid] [-A alg] [-t ttl] [
         -v             # verbose
 
 eg,
-     $0 -a https://my-tenant.auth0.com/ -i 6KS0YSEQwsvE9qRqtzonX8SEgJEYVzVH -k mykid -f ../ca/mydomain.local.key -P "response_type=code&scope=openid"
+     $0 -a https://my-tenant.auth0.com/ -i 6KS0YSEQwsvE9qRqtzonX8SEgJEYVzVH -k mykid -p ../ca/mydomain.local.key -P "response_type=code&scope=openid"
 END
     exit "$1"
 }
@@ -51,11 +51,11 @@ declare pem_file=''
 declare kid=''
 declare params=''
 
-while getopts "a:i:f:k:P:A:t:hv?" opt; do
+while getopts "a:i:p:k:P:A:t:hv?" opt; do
     case ${opt} in
     a) AUDIENCE=${OPTARG} ;;
     i) client_id=${OPTARG} ;;
-    f) pem_file=${OPTARG} ;;
+    p) pem_file=${OPTARG} ;;
     k) kid=${OPTARG} ;;
     P) params=${OPTARG} ;;
     A) alg=${OPTARG} ;;

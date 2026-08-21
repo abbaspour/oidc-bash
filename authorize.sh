@@ -297,7 +297,7 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
   [[ -z "${key_file}" ]] && { echo >&2 "ERROR: key_file undefined"; exit 2; }
   [[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
   declare signed_request
-  signed_request=$("${DIR}/jwt/jar.sh" -a "${issuer}" -i "${CLIENT_ID}" -k "${key_id}" -f "${key_file}" -P "${authorize_params}")
+  signed_request=$("${DIR}/jwt/jar.sh" -a "${issuer}" -i "${CLIENT_ID}" -k "${key_id}" -p "${key_file}" -P "${authorize_params}")
   readonly signed_request
   echo "$signed_request"
   authorize_params="client_id=${CLIENT_ID}&request=${signed_request}"

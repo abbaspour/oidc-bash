@@ -58,15 +58,14 @@ done
 
 
 cat <<EOL | node
-import {SignJWT} from 'jose/jwt/sign';
-import {parseJwk} from 'jose/jwk/parse';
+import * as jose from 'jose';
 import fs from 'node:fs';
 
 const jwk = JSON.parse(fs.readFileSync("${ORIG_KEY}", 'utf8'))
 
-const key = await parseJwk(jwk, 'ES256');
+const key = await jose.importJWK(jwk, 'ES256', {extractable: true});
 
-const signature = await new SignJWT({})
+const signature = await new jose.SignJWT({})
     .setProtectedHeader({alg: 'ES256', kid: "${KID}", typ: "${typ}"})
     .setIssuedAt()
     .setIssuer("${CLIENT_ID}")

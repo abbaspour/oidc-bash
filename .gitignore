@@ -4,3 +4,4 @@ env.inc
 *.pem
 cookie.txt
 .cache/
+web/.tunnel-token
