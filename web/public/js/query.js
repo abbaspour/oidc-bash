@@ -50,6 +50,14 @@
         copyBtn.setAttribute('aria-label', 'Copy to clipboard');
         copyBtn.textContent = '📋';
         tdV.appendChild(copyBtn);
+        tdV.appendChild(document.createTextNode(' '));
+        var copyExportBtn = document.createElement('button');
+        copyExportBtn.type = 'button';
+        copyExportBtn.className = 'copy-export-btn';
+        copyExportBtn.title = 'Copy as bash export command';
+        copyExportBtn.setAttribute('aria-label', 'Copy as bash export command');
+        copyExportBtn.textContent = '📋$';
+        tdV.appendChild(copyExportBtn);
         tr.appendChild(tdK);
         tr.appendChild(tdV);
         table.appendChild(tr);
