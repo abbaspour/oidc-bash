@@ -15,11 +15,6 @@ set -uo pipefail
 
 readonly MAX_PARAMS_LEN=65536   # cap processed query/body size to bound CPU/memory on oversized requests
 
-DIR="${BASH_SOURCE[0]%/*}"
-[ "$DIR" = "${BASH_SOURCE[0]}" ] && DIR="."
-DIR=$(cd "$DIR" && pwd)
-readonly DIR
-
 # Decodes only genuine %XX triples. Pre-doubling any literal backslash already present in
 # the input stops printf %b from reinterpreting attacker-supplied \n, \e, \cX, etc. as escapes.
 url_decode() {
@@ -77,21 +72,12 @@ if [[ -n "$params" ]]; then
         key=$(url_decode "$key")
         value=$(url_decode "$value")
         printf >&2 '  %s = %s\n' "$(sanitize_log "$key")" "$(sanitize_log "$value")"
-        html_rows+="<tr><td><b>$(html_escape "$key")</b></td><td><code>$(html_escape "$value")</code> <button type=\"button\" class=\"copy-btn\" title=\"Copy to clipboard\" aria-label=\"Copy to clipboard\">📋</button></td></tr>"
+        html_rows+="<tr><td><b>$(html_escape "$key")</b></td><td><code>$(html_escape "$value")</code> <button type=\"button\" class=\"copy-btn\" title=\"Copy to clipboard\" aria-label=\"Copy to clipboard\">📋</button> <button type=\"button\" class=\"copy-export-btn\" title=\"Copy as bash export command\" aria-label=\"Copy as bash export command\">📋\$</button></td></tr>"
     done
 else
     echo >&2 "  (no ${source_label} parameters)"
     html_rows="<tr><td colspan=\"2\"><i>(no ${source_label} parameters)</i></td></tr>"
 fi
-
-copy_script=''
-[[ -f "${DIR}/../js/copy.js" ]] && copy_script=$(<"${DIR}/../js/copy.js")
-jwt_script=''
-[[ -f "${DIR}/../js/jwt.js" ]] && jwt_script=$(<"${DIR}/../js/jwt.js")
-script_content=''
-[[ -f "${DIR}/../js/hash.js" ]] && script_content=$(<"${DIR}/../js/hash.js")
-saml_script=''
-[[ -f "${DIR}/../js/saml.js" ]] && saml_script=$(<"${DIR}/../js/saml.js")
 
 printf 'Content-Type: text/html; charset=utf-8\nCache-Control: no-store\nX-Frame-Options: DENY\n\n'
 cat <<HTML
@@ -101,13 +87,13 @@ cat <<HTML
 table{border-collapse:collapse;width:100%}
 td{border:1px solid #ccc;padding:6px 10px;vertical-align:top}
 code{word-break:break-all}
-.copy-btn{border:none;background:none;cursor:pointer;font-size:0.9em;padding:0 4px;vertical-align:middle}
-.copy-btn:hover{opacity:0.7}</style></head>
+.copy-btn,.copy-export-btn{border:none;background:none;cursor:pointer;font-size:0.9em;padding:0 4px;vertical-align:middle}
+.copy-btn:hover,.copy-export-btn:hover{opacity:0.7}</style></head>
 <body><h1>OIDC Callback</h1>
 <table>${html_rows}</table>
-<script>${copy_script}</script>
-<script>${jwt_script}</script>
-<script>${script_content}</script>
-<script>${saml_script}</script>
+<script src="/js/jwt.js"></script>
+<script src="/js/copy.js"></script>
+<script src="/js/hash.js"></script>
+<script src="/js/saml.js"></script>
 </body></html>
 HTML
