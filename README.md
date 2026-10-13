@@ -38,6 +38,8 @@ You'll see some code duplicate all authenticating against token endpoint however
 | [`revoke-refresh-token.sh`](./revoke-refresh-token.sh) | Revokes a refresh token via the `/oauth/revoke` endpoint.                                                                      |
 | [`logout.sh`](./logout.sh)                             | Performs RP-Initiated Logout via `/oidc/logout` (or federated/SAML logout variants).                                           |
 | [`web/server.sh`](./web/server.sh)                     | Starts a Python CGI HTTP server; serves a callback handler at `/cgi-bin/cb.sh` (default port 1980).                            |
+| [`anonymous-token.sh`](./anonymous-token.sh)           | Requests an anonymous session and access token from `/anonymous/token` (supports metadata, renewal, and a curl cookie jar).    |
+| [`anonymous-logout.sh`](./anonymous-logout.sh)         | Ends an anonymous session at `/anonymous/logout` and removes the `auth0_anon` cookie from the curl cookie jar.                 |
 
 
 # Check
