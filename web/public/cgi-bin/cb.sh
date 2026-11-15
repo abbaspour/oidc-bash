@@ -8,7 +8,7 @@
 # cb.sh: CGI callback handler for OAuth2/OIDC redirect_uri.
 # Parses QUERY_STRING (GET) or stdin (POST form), renders an HTML key-value table,
 # and embeds hash.js so fragment (#) parameters are also displayed client-side.
-# Run via: web/server.sh  (python3 -m http.server --cgi)
+# Run via: web/server.sh
 ##########################################################################################
 
 set -uo pipefail
