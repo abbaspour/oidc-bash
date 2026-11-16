@@ -27,7 +27,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X
         -a code        # Authorization Code to exchange
         -r req_id      # back channel authorization (CIBA) auth_req_id
         -C code        # Device Code to exchange
-        -u callback    # callback URL
+        -u callback    # callback URL (default ${REDIRECT_URI}). pass '' to omit redirect_uri
         -U endpoint    # token endpoint URI (default is 'oauth/token')
         -k kid         # client public key JWT-CA key id
         -K private.pem # JWT-CA client private key file for client assertion
@@ -96,7 +96,6 @@ done
 
 [[ -z "${DOMAIN}" ]] && { echo >&2 "ERROR: DOMAIN undefined"; usage 1; }
 [[ -z "${CLIENT_ID}" ]] && { echo >&2 "ERROR: CLIENT_ID undefined"; usage 1; }
-[[ -z "${REDIRECT_URI}" ]] && { echo >&2 "ERROR: REDIRECT_URI undefined"; usage 1; }
 [[ -z "${authorization_code}" ]] && { echo >&2 "ERROR: authorization_code undefined"; usage 1; }
 
 [[ ${DOMAIN} =~ ^http ]] || DOMAIN=https://${DOMAIN}
@@ -106,10 +105,14 @@ declare issuer="${DOMAIN}"
 [[ ${issuer} =~ /$ ]] || issuer="${issuer}/"
 
 declare secret=''
+declare redirect_uri=''
 declare authorization_header=''
 declare dpop_header=''
 
 declare assertion=''
+
+# codes from flows without a front-channel redirect (e.g. Auth0 /e/authorize) are exchanged without redirect_uri
+[[ -n "${REDIRECT_URI}" ]] && redirect_uri="\"redirect_uri\":\"${REDIRECT_URI}\","
 
 # OIDC Discovery to resolve token endpoint (unless disabled via -D); -W forces a cache-bypassing re-fetch
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
@@ -154,8 +157,8 @@ BODY=$(cat <<EOL
     ${secret}
     "${code_type}": "${authorization_code}",
     "grant_type":"${grant_type}",
-    "scope":"openid",
-    "redirect_uri": "${REDIRECT_URI}"
+    ${redirect_uri}
+    "scope":"openid"
 ${client_assertion}
 }
 EOL
