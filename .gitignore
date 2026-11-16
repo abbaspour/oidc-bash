@@ -5,3 +5,4 @@ env.inc
 cookie.txt
 .cache/
 web/.tunnel-token
+anon-cookie.txt

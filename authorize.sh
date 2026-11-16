@@ -19,7 +19,7 @@ readonly DIR
 # 3. ./authorize.sh -t tenant -c client_id
 ##
 
-declare REDIRECT_URI='http://local.abbaspour.net:1980/cgi-bin/cb.sh'
+declare REDIRECT_URI='https://jwt.io'
 declare SCOPE='openid profile email'
 declare RESPONSE_TYPE='id_token'
 declare RESPONSE_MODE=''
