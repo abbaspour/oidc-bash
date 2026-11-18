@@ -17,7 +17,7 @@ declare alg='RS256'
 
 function usage() {
   cat <<END >&2
-USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X code_verifier] [-P dpop.pem] [-u callback] [-a authorization_code] [-p] [-D] [-v|-h]
+USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X code_verifier] [-P dpop.pem] [-u callback] [-a authorization_code] [-R resource] [-p] [-D] [-v|-h]
         -e file        # .env file location (default cwd)
         -t tenant      # tenant@region shorthand (Auth0-style, appends .auth0.com)
         -d domain      # OIDC provider domain
@@ -29,6 +29,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-x client_secret] [-X
         -C code        # Device Code to exchange
         -u callback    # callback URL (default ${REDIRECT_URI}). pass '' to omit redirect_uri
         -U endpoint    # token endpoint URI (default is 'oauth/token')
+        -R resource    # RFC 8707 resource indicator: a token for this resource only
         -k kid         # client public key JWT-CA key id
         -K private.pem # JWT-CA client private key file for client assertion
         -A alg         # JWT-CA algorithm. default ${alg}. supports: RS256, ES256, PS256
@@ -59,15 +60,17 @@ declare kid=''
 declare private_pem=''
 declare dpop_pem_file=''
 declare token_endpoint_path='oauth/token'
+declare RESOURCE=''
 declare code_type='code'
 declare opt_verbose=''
 declare opt_disable_discovery=0
 declare opt_force_refresh=0
 declare content_type='application/json'
 
-[[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
+# OIDC_BASH_NO_DOTENV=1 skips the automatic .env, eg. when another tool calls this script
+[[ -z "${OIDC_BASH_NO_DOTENV:-}" && -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:DWbphv?" opt; do
+while getopts "e:t:d:c:u:a:x:X:P:C:r:U:R:k:K:A:DWbphv?" opt; do
   case ${opt} in
   e) source "${OPTARG}" ;;
   t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -79,6 +82,7 @@ while getopts "e:t:d:c:u:a:x:X:P:C:r:U:k:K:A:DWbphv?" opt; do
   X) code_verifier=${OPTARG} ;;
   P) dpop_pem_file=${OPTARG} ;;
   U) token_endpoint_path=${OPTARG} ;;
+  R) RESOURCE=${OPTARG} ;;
   k) kid=${OPTARG} ;;
   K) private_pem=${OPTARG} ;;
   A) alg=${OPTARG} ;;
@@ -114,6 +118,9 @@ declare assertion=''
 # codes from flows without a front-channel redirect (e.g. Auth0 /e/authorize) are exchanged without redirect_uri
 [[ -n "${REDIRECT_URI}" ]] && redirect_uri="\"redirect_uri\":\"${REDIRECT_URI}\","
 
+declare resource=''
+[[ -n "${RESOURCE}" ]] && resource="\"resource\":\"${RESOURCE}\","
+
 # OIDC Discovery to resolve token endpoint (unless disabled via -D); -W forces a cache-bypassing re-fetch
 if [[ ${opt_disable_discovery} -eq 0 ]]; then
   declare -a discovery_args=(-d "${DOMAIN}" -f issuer -f token_endpoint)
@@ -133,11 +140,13 @@ if [[ ${http_basic} -eq 1 ]]; then
   authorization_header="Authorization: Basic "
   authorization_header+=$(printf "%s:%s" "${CLIENT_ID}" "${CLIENT_SECRET}" | openssl base64 -e -A)
 else
-  [[ -n "${CLIENT_SECRET}" ]] && secret="\"client_secret\":\"${CLIENT_SECRET}\","
+  # one client authentication method per request (RFC 6749 §2.3): JWT-CA (-k/-K) wins over a secret
+  [[ -n "${CLIENT_SECRET}" && -z "${private_pem}" ]] && secret="\"client_secret\":\"${CLIENT_SECRET}\","
   [[ -n "${code_verifier}" ]] && secret+="\"code_verifier\":\"${code_verifier}\","
 fi
 
-if [[ -n "${kid}" && -n "${private_pem}" && -f "${private_pem}" ]]; then
+if [[ -n "${private_pem}" ]]; then
+  [[ -f "${private_pem}" ]] || { echo >&2 "ERROR: private key missing: ${private_pem}"; usage 1; }
   assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${CLIENT_ID}" -k "${kid}" -f "${private_pem}" -A "${alg}" )
   readonly assertion
   client_assertion=$(cat <<EOL
@@ -158,6 +167,7 @@ BODY=$(cat <<EOL
     "${code_type}": "${authorization_code}",
     "grant_type":"${grant_type}",
     ${redirect_uri}
+    ${resource}
     "scope":"openid"
 ${client_assertion}
 }

@@ -165,9 +165,8 @@ id_token=$(echo "${location}" | grep -oE "id_token=([^&]+)" | awk -F= '{print $2
 declare state
 state=$(echo "${location}" | grep -oE "state=([^&]+)" | awk -F= '{print $2}')
 
-## TODO: check if `base64` installed
 declare id_token_json
-id_token_json=$(echo "${id_token}" | awk -F. '{print $2}' | base64 -di 2>/dev/null)
+id_token_json=$(jq -Rr 'split(".")[1] | gsub("-";"+") | gsub("_";"/") | @base64d' <<<"${id_token}" 2>/dev/null)
 
 echo "Access Token: ${access_token}"
 echo "ID     Token: ${id_token_json}"

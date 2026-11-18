@@ -104,7 +104,7 @@ readonly body
 [[ -n "${opt_verbose}" ]] && echo >&2 "${body}"
 
 declare json
-json=$(mktemp --suffix=.json)
+json=$(mktemp)
 readonly json
 echo "${body}" >"${json}"
 
