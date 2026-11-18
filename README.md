@@ -18,6 +18,7 @@ You'll see some code duplicate all authenticating against token endpoint however
 - [OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer (DPoP) - RFC-9449](https://datatracker.ietf.org/doc/html/rfc9449)
 - [OAuth 2.0 Token Exchange - RFC-8693](https://datatracker.ietf.org/doc/html/rfc8693)
 - [OAuth 2.0 JSON Web Token (JWT) Profile for Client Authentication and Authorization Grants - RFC-7523](https://datatracker.ietf.org/doc/html/rfc7523)
+- [OAuth 2.0 for First-Party Applications](https://datatracker.ietf.org/doc/draft-ietf-oauth-first-party-apps/) - as Auth0's vendor-specific `/e/authorize`, see [docs/e-authorize.md](./docs/e-authorize.md)
 - [Identity Assertion JWT Authorization Grant (ID-JAG)](https://datatracker.ietf.org/doc/draft-ietf-oauth-identity-assertion-authz-grant/)
 
 ## OIDC Family
@@ -29,7 +30,7 @@ You'll see some code duplicate all authenticating against token endpoint however
 | Script                                                 | Description                                                                                                                    |
 |--------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
 | [`authorize.sh`](./authorize.sh)                       | Initiates the Authorization Code flow by building an `/authorize` URL (supports PKCE, PAR, JAR) and opening it in the browser. |
-| [`code-exchange.sh`](./code-exchange.sh)               | Exchanges an authorization code for tokens at the `/token` endpoint (supports PKCE, DPoP, private key JWT, Device Code, CIBA). |
+| [`code-exchange.sh`](./code-exchange.sh)               | Exchanges an authorization code for tokens at the `/token` endpoint (supports PKCE, DPoP, private key JWT, Device Code, CIBA); `-u ''` omits `redirect_uri`. |
 | [`client-credentials.sh`](./client-credentials.sh)     | Performs the Client Credentials grant for machine-to-machine access tokens (supports client secret, private key JWT, mTLS).    |
 | [`device-flow.sh`](./device-flow.sh)                   | Initiates the OAuth 2.0 Device Authorization Grant (RFC 8628) and returns a user code and verification URI.                    |
 | [`refresh.sh`](./refresh.sh)                           | Uses a refresh token to obtain a new access token (supports DPoP and scope/audience downscoping).                              |
@@ -40,6 +41,7 @@ You'll see some code duplicate all authenticating against token endpoint however
 | [`web/server.sh`](./web/server.sh)                     | Starts a Python CGI HTTP server; serves a callback handler at `/cgi-bin/cb.sh` (default port 1980).                            |
 | [`anonymous-token.sh`](./anonymous-token.sh)           | Requests an anonymous session and access token from `/anonymous/token` (supports metadata, renewal, and a curl cookie jar).    |
 | [`anonymous-logout.sh`](./anonymous-logout.sh)         | Ends an anonymous session at `/anonymous/logout` and removes the `auth0_anon` cookie from the curl cookie jar.                 |
+| [`e-authorize.sh`](./e-authorize.sh)                   | Auth0 Embedded Authorize (`/e/authorize`, First-Party Apps): interactive or single-step email OTP + MFA, returns an authorization code (`-T` exchanges it). |
 
 
 # Check
