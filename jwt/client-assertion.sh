@@ -26,7 +26,7 @@ USAGE: $0 [-e env] [-a audience] [-i client_id] [-f file] [-k kid] [-A alg] [-t 
         -a audience     # audience
         -i client_id    # client_id
         -k kid          # key id. optional.
-        -f file         # private key PEM  file
+        -f file         # private key file: PEM, or a JWK JSON file for ES256
         -A alg          # algorithm. default ${alg}. supports: RS256, ES256, PS256
         -t ttl          # TTL in seconds. default is 300
         -h|?            # usage
@@ -82,7 +82,7 @@ readonly JTI
 body=$(printf '{"iat": %s, "iss":"%s","sub":"%s","aud":"%s","exp":%s, "jti": "%s"}' "${now}" "${client_id}" "${client_id}" "${AUDIENCE}" "${exp}" "${JTI}")
 readonly body
 
-json=$(mktemp --suffix=.json)
+json=$(mktemp)
 readonly json
 
 echo "${body}" > "${json}"
@@ -90,7 +90,13 @@ echo "${body}" > "${json}"
 case "${ALG}" in
   RS256|PS256) "${DIR}"/sign-rs256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}" -A "${ALG}";;
   HS256) "${DIR}"/sign-hs256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}";;
-  ES256) "${DIR}"/sign-es256-jose.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}";;
+  ES256)
+    # a PEM key is signed with openssl; a JWK (JSON) key file with node + jose
+    if grep -q -- '-----BEGIN' "${pem_file}"; then
+      "${DIR}"/sign-es256.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}"
+    else
+      "${DIR}"/sign-es256-jose.sh -a "${AUDIENCE}" -i "${client_id}" -k "${kid}" -f "${json}" -p "${pem_file}"
+    fi;;
   *)  echo >&2 "ERROR: unsupported algorithm: ${ALG}"; usage 1;;
 esac
 

@@ -29,20 +29,30 @@ You'll see some code duplicate all authenticating against token endpoint however
 
 | Script                                                 | Description                                                                                                                    |
 |--------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| [`authorize.sh`](./authorize.sh)                       | Initiates the Authorization Code flow by building an `/authorize` URL (supports PKCE, PAR, JAR) and opening it in the browser. |
-| [`code-exchange.sh`](./code-exchange.sh)               | Exchanges an authorization code for tokens at the `/token` endpoint (supports PKCE, DPoP, private key JWT, Device Code, CIBA); `-u ''` omits `redirect_uri`. |
+| [`authorize.sh`](./authorize.sh)                       | Initiates the Authorization Code flow by building an `/authorize` URL (supports PKCE, PAR, JAR, RFC 8707 `-q resource`; `-k`/`-K`/`-Y` sign a private key JWT for PAR and CIBA) and opening it in the browser. |
+| [`code-exchange.sh`](./code-exchange.sh)               | Exchanges an authorization code for tokens at the `/token` endpoint (supports PKCE, DPoP, private key JWT, Device Code, CIBA, RFC 8707 `-R resource`); `-u ''` omits `redirect_uri`. |
 | [`client-credentials.sh`](./client-credentials.sh)     | Performs the Client Credentials grant for machine-to-machine access tokens (supports client secret, private key JWT, mTLS).    |
-| [`device-flow.sh`](./device-flow.sh)                   | Initiates the OAuth 2.0 Device Authorization Grant (RFC 8628) and returns a user code and verification URI.                    |
-| [`refresh.sh`](./refresh.sh)                           | Uses a refresh token to obtain a new access token (supports DPoP and scope/audience downscoping).                              |
+| [`device-flow.sh`](./device-flow.sh)                   | Initiates the OAuth 2.0 Device Authorization Grant (RFC 8628) and returns a user code and verification URI (supports private key JWT and RFC 8707 `-R resource`). |
+| [`refresh.sh`](./refresh.sh)                           | Uses a refresh token to obtain a new access token (supports DPoP, private key JWT, scope/audience downscoping and RFC 8707 `-R resource`). |
 | [`resource-owner.sh`](./resource-owner.sh)             | Performs the Resource Owner Password Credentials grant (legacy ROPG flow).                                                     |
 | [`token-exchange.sh`](./token-exchange.sh)             | Performs OAuth 2.0 Token Exchange (RFC 8693) to swap one token for another.                                                    |
-| [`revoke-refresh-token.sh`](./revoke-refresh-token.sh) | Revokes a refresh token via the `/oauth/revoke` endpoint.                                                                      |
+| [`revoke-refresh-token.sh`](./revoke-refresh-token.sh) | Revokes a refresh token via the `/oauth/revoke` endpoint (supports private key JWT); exits non-zero unless HTTP 2xx. |
 | [`logout.sh`](./logout.sh)                             | Performs RP-Initiated Logout via `/oidc/logout` (or federated/SAML logout variants).                                           |
 | [`web/server.sh`](./web/server.sh)                     | Starts a Python CGI HTTP server; serves a callback handler at `/cgi-bin/cb.sh` (default port 1980).                            |
 | [`anonymous-token.sh`](./anonymous-token.sh)           | Requests an anonymous session and access token from `/anonymous/token` (supports metadata, renewal, and a curl cookie jar).    |
 | [`anonymous-logout.sh`](./anonymous-logout.sh)         | Ends an anonymous session at `/anonymous/logout` and removes the `auth0_anon` cookie from the curl cookie jar.                 |
 | [`e-authorize.sh`](./e-authorize.sh)                   | Auth0 Embedded Authorize (`/e/authorize`, First-Party Apps): interactive or single-step email OTP + MFA, returns an authorization code (`-T` exchanges it). |
 
+
+# Environment
+Scripts load `.env` from the repo folder automatically; `-e file` loads another one. Set `OIDC_BASH_NO_DOTENV=1`
+to skip the automatic `.env`, for example when another tool calls these scripts and passes everything it needs as flags.
+
+When a private key JWT key (`-K`) is given, scripts authenticate with it only, and don't also send a `CLIENT_SECRET`
+from `.env` (RFC 6749 2.3).
+
+Scripts need bash 4+ (`mapfile`, `${var^^}`). macOS ships bash 3.2, so install a newer one with `brew install bash`
+and make sure it comes first on `PATH`.
 
 # Check
 ```bash

@@ -36,6 +36,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -c client_id   # OAuth2/OIDC client ID
         -x secret      # OAuth2/OIDC client secret (for PAR and CIBA)
         -a audience    # Audience
+        -q resource    # RFC 8707 resource indicator (repeatable)
         -r realm       # Connection
         -T types       # comma separated response types (default is "${RESPONSE_TYPE}")
         -f flow        # OAuth2 flow type (implicit,code,pkce,hybrid)
@@ -54,6 +55,7 @@ USAGE: $0 [-e env] [-t tenant] [-d domain] [-c client_id] [-a audience] [-r conn
         -E key=value   # additional comma separated list of key=value parameters to be sent as ext-key
         -k key_id      # client credentials key_id
         -K file.pem    # client credentials private key
+        -Y alg         # JWT-CA algorithm for the PAR/CIBA client assertion. default RS256. supports: RS256, ES256, PS256
         -j file        # path to file containing authorization_details JSON format array, for RAR
         -L protocol    # protocol to use. can be samlp, wsfed or oauth (default)
         -g token       # send session_transfer_token as get query param
@@ -84,20 +86,18 @@ urlencode() {
     jq -rn --arg x "${1}" '$x|@uri'
 }
 
-random32() {
-    for _ in {0..45}; do echo -n $((RANDOM % 10)); done
-}
-
+# base64url-encodes stdin (stay in a pipe: bash command substitution drops NUL bytes from binary data)
 base64URLEncode() {
-  echo -n "$1" | base64 -w0 | tr '+' '-' | tr '/' '_' | tr -d '='
+  openssl base64 -A | tr '+/' '-_' | tr -d '='
 }
 
+# RFC 7636 §4.1: 32 random octets, base64url-encoded (43 characters)
 gen_code_verifier() {
-    base64URLEncode "$(random32)"
+    openssl rand 32 | openssl base64 -A | tr '+/' '-_' | tr -d '='
 }
 
 gen_code_challenge() {
-    base64URLEncode "$(echo -n "$1" | openssl dgst -binary -sha256)"
+    printf '%s' "$1" | openssl dgst -binary -sha256 | base64URLEncode
 }
 
 #declare -r CURL='/opt/homebrew/opt/curl/bin/curl'
@@ -126,6 +126,7 @@ declare ui_locales=''
 declare invitation=''
 declare key_id=''
 declare key_file=''
+declare assertion_alg='RS256'
 declare authorization_details=''
 declare protocol='oauth'
 declare opt_pp=1
@@ -135,15 +136,17 @@ declare opt_jar=0
 declare opt_ciba=0
 declare opt_binding_message=''
 declare opt_ext_params=''
+declare -a resources=()
 declare opt_session_transfer_token_query=''
 declare opt_session_transfer_token_cookie=''
 declare opt_verbose=0
 declare opt_disable_discovery=0
 declare opt_force_refresh=0
 
-[[ -f "${DIR}/.env" ]] && . "${DIR}/.env"
+# OIDC_BASH_NO_DOTENV=1 skips the automatic .env, eg. when another tool calls this script
+[[ -z "${OIDC_BASH_NO_DOTENV:-}" && -f "${DIR}/.env" ]] && . "${DIR}/.env"
 
-while getopts "e:t:d:c:x:a:r:R:A:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DWmMFCOP:QJNhv?" opt; do
+while getopts "e:t:d:c:x:a:r:R:A:f:u:p:s:S:n:H:I:o:i:l:E:k:K:Y:q:j:T:g:G:B:L:U:DWmMFCOP:QJNhv?" opt; do
     case ${opt} in
     e) source "${OPTARG}" ;;
     t) DOMAIN=$(echo "${OPTARG}.auth0.com" | tr '@' '.') ;;
@@ -167,8 +170,10 @@ while getopts "e:t:d:c:x:a:r:R:A:f:u:p:s:S:n:H:I:o:i:l:E:k:K:j:T:g:G:B:L:U:DWmMF
     i) invitation=${OPTARG} ;;
     l) ui_locales=${OPTARG} ;;
     E) opt_ext_params=$(echo "${OPTARG}" | tr ',' ' ') ;;
+    q) resources+=("${OPTARG}") ;;
     k) key_id="${OPTARG}";;
     K) key_file="${OPTARG}";;
+    Y) assertion_alg="${OPTARG}";;
     j) authorization_details="${OPTARG}";;
     L) protocol="${OPTARG}";;
     g) opt_session_transfer_token_query="${OPTARG}";;
@@ -274,9 +279,10 @@ fi
 
 
 # shellcheck disable=SC2155
-declare authorize_params="client_id=${CLIENT_ID}&${response_param}&nonce=$(urlencode "${opt_nonce}")&redirect_uri=$(urlencode "${REDIRECT_URI}")&scope=$(urlencode "${SCOPE}")"
+declare authorize_params="client_id=$(urlencode "${CLIENT_ID}")&${response_param}&nonce=$(urlencode "${opt_nonce}")&redirect_uri=$(urlencode "${REDIRECT_URI}")&scope=$(urlencode "${SCOPE}")"
 
 [[ -n "${AUDIENCE}" ]] && authorize_params+="&audience=$(urlencode "${AUDIENCE}")"
+for r in ${resources[@]+"${resources[@]}"}; do authorize_params+="&resource=$(urlencode "${r}")"; done
 [[ -n "${CONNECTION}" ]] && authorize_params+="&connection=${CONNECTION}"
 [[ -n "${PROMPT}" ]] && authorize_params+="&prompt=${PROMPT}"
 [[ -n "${RESPONSE_MODE}" ]] && authorize_params+="&response_mode=${RESPONSE_MODE}"
@@ -300,22 +306,27 @@ if [[ ${opt_jar} -ne 0 ]]; then                       # JAR
   signed_request=$("${DIR}/jwt/jar.sh" -a "${issuer}" -i "${CLIENT_ID}" -k "${key_id}" -p "${key_file}" -P "${authorize_params}")
   readonly signed_request
   echo "$signed_request"
-  authorize_params="client_id=${CLIENT_ID}&request=${signed_request}"
+  authorize_params="client_id=$(urlencode "${CLIENT_ID}")&request=${signed_request}"
 fi
 
-if [[ -n "${CLIENT_SECRET}" ]]; then                      # confidential client for PAR and CIBA
-  authorize_params+="&client_secret=${CLIENT_SECRET}"
-elif [[ -n "${key_id}" ]]; then                                                # JWT-CA
-  declare signed_client_assertion
-  signed_client_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -f "${key_file}" -k "${key_id}" -t JWT)
-  readonly signed_client_assertion
-  authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+# client credentials go only on the back-channel PAR and CIBA requests, never in a URL the browser opens
+if [[ ${opt_par} -ne 0 || ${opt_ciba} -ne 0 ]]; then
+  # one client authentication method (RFC 6749 §2.3): JWT-CA (-K) wins over a secret
+  if [[ -n "${key_file}" ]]; then                         # JWT-CA (private_key_jwt); aud is the issuer
+    [[ ! -f "${key_file}" ]] && { echo >&2 "ERROR: key_file missing: ${key_file}"; exit 2; }
+    declare signed_client_assertion
+    signed_client_assertion=$("${DIR}"/jwt/client-assertion.sh -a "${issuer}" -i "${CLIENT_ID}" -k "${key_id}" -f "${key_file}" -A "${assertion_alg}")
+    readonly signed_client_assertion
+    authorize_params+="&client_assertion=${signed_client_assertion}&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+  elif [[ -n "${CLIENT_SECRET}" ]]; then                  # confidential client
+    authorize_params+="&client_secret=$(urlencode "${CLIENT_SECRET}")"
+  fi
 fi
 
 if [[ ${opt_par} -ne 0 ]]; then                       # PAR
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
-  [[ -n "${opt_verbose}" ]] && echo >&2 "> POST ${par_endpoint} ${authorize_params}"
+  [[ ${opt_verbose} -eq 1 ]] && echo >&2 "> POST ${par_endpoint} ${authorize_params}"
 
   declare request_uri
   declare par_response
@@ -344,9 +355,10 @@ if [[ ${opt_par} -ne 0 ]]; then                       # PAR
       -d "${authorize_params}")
   fi
 
-  request_uri=$(echo "${par_response}" | jq -r '.request_uri')
+  request_uri=$(echo "${par_response}" | jq -r '.request_uri // empty')
   readonly request_uri
-  authorize_params="client_id=${CLIENT_ID}&request_uri=${request_uri}"
+  [[ -n "${request_uri}" ]] || { echo >&2 "ERROR: PAR failed: ${par_response}"; exit 1; }
+  authorize_params="client_id=$(urlencode "${CLIENT_ID}")&request_uri=$(urlencode "${request_uri}")"
 
   [[ -n "${dpop_pem_file}" ]] && echo >&2 "note: reuse -P ${dpop_pem_file} in code-exchange.sh to complete the DPoP-bound code exchange"
 
@@ -357,7 +369,7 @@ elif [[ ${opt_ciba} -ne 0 ]]; then                    # CIBA
 
   command -v jq >/dev/null || {  echo >&2 "error: jq not found";  exit 3; }
 
-  [[ -n "${opt_verbose}" ]] && echo >&2 "> POST ${bc_authorization_endpoint} ${authorize_params}"
+  [[ ${opt_verbose} -eq 1 ]] && echo >&2 "> POST ${bc_authorization_endpoint} ${authorize_params}"
 
   declare auth_req_id
   auth_req_id=$("${CURL}" -s -k --header "accept: application/x-www-form-urlencoded" --url "${bc_authorization_endpoint}" \
@@ -381,4 +393,5 @@ else
     /g; s/%20/ /g; s/%3A/:/g;s/%2F/\//g'
 fi
 
-[[ -n "${opt_clipboard}" ]] && echo "${authorize_url}" | pbcopy
+# an if, not `[[ ]] &&`: as the last command, a false test would make the script exit 1
+if [[ -n "${opt_clipboard}" ]]; then echo "${authorize_url}" | pbcopy; fi

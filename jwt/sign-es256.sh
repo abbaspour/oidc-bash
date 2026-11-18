@@ -124,10 +124,12 @@ SIGNED_INPUT="${HEADER_B64}.${PAYLOAD_B64}"
 
 # hash → sign (DER ECDSA)
 MSG_BIN="$(mktemp)"; SIG_DER="$(mktemp)"; SIG_RAW="$(mktemp)"
-printf '%s' "$SIGNED_INPUT" | openssl dgst -sha256 -binary > "$MSG_BIN"
+printf '%s' "$SIGNED_INPUT" > "$MSG_BIN"
 
-if ! openssl pkeyutl -sign -inkey "$TMPKEY" -rawin -in "$MSG_BIN" -out "$SIG_DER"; then
-  echo "ERROR: openssl pkeyutl failed to sign. Check key format/provider." >&2
+# sign the JWS signing input itself: `openssl dgst -sha256 -sign` hashes it once. Passing a
+# pre-computed digest to `pkeyutl -rawin` would hash it a second time and the JWT wouldn't verify.
+if ! openssl dgst -sha256 -sign "$TMPKEY" -binary -out "$SIG_DER" "$MSG_BIN"; then
+  echo "ERROR: openssl failed to sign. Check key format/provider." >&2
   [[ "$TMPKEY" != "$ORIG_KEY" ]] && rm -f "$TMPKEY"
   rm -f "$MSG_BIN" "$SIG_DER" "$SIG_RAW"
   exit 1
